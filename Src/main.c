@@ -57,6 +57,8 @@ uint8_t TagID[4];
   uint32_t Address = 0, PageError = 0;
   
 //#define IBtemp 1
+  #define INPUT_SIZE 76
+#define OUTPUT_SIZE 37
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -99,6 +101,7 @@ void LedOn(void);
 void LedOff(void);
 uint8_t itoa(uint8_t i);
 void hextoc(uint8_t hex,uint8_t* msb,uint8_t* lsb);
+void hex_string_to_bytes(const char input[INPUT_SIZE], uint8_t output[OUTPUT_SIZE]);
 //uint16_t Temp;
 //uint16_t Humi;
 //float Temp;
@@ -204,6 +207,7 @@ uint8_t ble_adv_pdu_HYUMI[] =
       uint8_t val[2];
       uint8_t MN[2];
       uint8_t MJ[2];
+      uint8_t M;
 /* USER CODE END 0 */
 
 /**
@@ -263,17 +267,26 @@ uint8_t ble_adv_pdu_HYUMI[] =
   MAC[2] = 0xA4;
   MAC[1] = 0x73;
   MAC[0] = 0xE0;
-#endif
+
     MAC[5] = 0xF1;
   MAC[4] = 0xF8;
   MAC[3] = 0xDB;
   MAC[2] = 0x12;
   MAC[1] = 0xC4;
   MAC[0] = 0x6D;
-  
+  #endif
 #endif
   UartTest();
+#if 0
   GetMM();
+#endif
+  
+  for(int8_t a=0;a<7;a++)
+  {
+    M = *((uint8_t*)(FLASH_USER_START_ADDR+5-a));
+    MAC[a]=M;
+  }
+ // memcpy(MAC, (uint8_t*)FLASH_USER_START_ADDR,BD_ADDR_SIZE);
 #ifndef SHIPREK
 #ifndef IBtemp
   ble_adv_pdu_IBEACON[25] = MJ[1];
@@ -498,7 +511,8 @@ for(i=0;i<6;i++)//0-5
         {
           pdu_length = sizeof(ble_adv_pdu_IBEACON)+ADV_ADDR_SIZE;       
          AdvPayload.header.bits.length = pdu_length;
-          memcpy(AdvPayload.adv_data,ble_adv_pdu_IBEACON,sizeof(ble_adv_pdu_IBEACON));
+          //memcpy(AdvPayload.adv_data,ble_adv_pdu_IBEACON,sizeof(ble_adv_pdu_IBEACON));
+         memcpy(AdvPayload.adv_data,(uint8_t*)(FLASH_USER_START_ADDR+6),31);
         }
         else 
         {
@@ -812,29 +826,46 @@ void UartTest(void)
 static FLASH_EraseInitTypeDef EraseInitStruct;
 //uint8_t i;
     uint8_t TxBuf[20];
-    uint8_t RxBuf[15];
+    uint8_t RxBuf[78];
+    uint8_t OUT[37];
     uint32_t TempInt2=0;
+    uint8_t *Ptx;
     uint8_t i = 0;
     HAL_StatusTypeDef ret;
     uint8_t MM[8];
     TxBuf[0] = 'M';
     TxBuf[1] = ':';
+    Ptx = (uint8_t*)FLASH_USER_START_ADDR;
+#if 0    
     for(i=0;i<6;i++)
     {
       hextoc(MAC[i],&TxBuf[12-(i*2)],&TxBuf[13-(i*2)]);
+
+    }
+  TxBuf[14] = ',';
+#endif
+  HAL_UART_Transmit(&huart1,TxBuf,2,100);
+            HAL_Delay(2);
+      for(i=0;i<12;i+=2)
+    {
+      hextoc(*Ptx,&TxBuf[0],&TxBuf[1]);
+            Ptx++;
+            HAL_UART_Transmit(&huart1,TxBuf,2,100);
+            HAL_Delay(2);
+    }
+      TxBuf[0] = ',';
+      TxBuf[1] = 'U';
+      TxBuf[2] = ':';
+      HAL_UART_Transmit(&huart1,TxBuf,3,100);
+            HAL_Delay(2);
+          for(i=0;i<62;i+=2)
+    {
+      hextoc(*Ptx,&TxBuf[0],&TxBuf[1]);
+            Ptx++;
+            HAL_UART_Transmit(&huart1,TxBuf,2,100);
+            HAL_Delay(2);
     }
 #if 0
-  hextoc(MAC[0],&TxBuf[12],&TxBuf[13]);
-   hextoc(MAC[1],&TxBuf[10],&TxBuf[11]);
-    hextoc(MAC[2],&TxBuf[8],&TxBuf[9]);
-     hextoc(MAC[3],&TxBuf[6],&TxBuf[7]);
-      hextoc(MAC[4],&TxBuf[4],&TxBuf[5]);
-       hextoc(MAC[5],&TxBuf[2],&TxBuf[3]);
-#endif
-  TxBuf[14] = ',';
-  //TxBuf[14] = 0x0d;
-  //TxBuf[15] = 0x0a;
-  HAL_UART_Transmit(&huart1,TxBuf,15,100);
   memcpy(MM, (void*)FLASH_USER_START_ADDR,8);
   for(i=0;i<4;i++)
   {
@@ -853,13 +884,17 @@ static FLASH_EraseInitTypeDef EraseInitStruct;
       TxBuf[11] = 0x0d;
       TxBuf[12] = 0x0a;
       HAL_UART_Transmit(&huart1,TxBuf,13,100);
+#endif
 //  while(ret != HAL_OK)
  // {
-    ret = HAL_UART_Receive(&huart1,RxBuf,12,3000);
+    ret = HAL_UART_Receive(&huart1,RxBuf,77,4000);
   //}
-  if(RxBuf[0] == 'I' && RxBuf[1] == 'D' && RxBuf[11] == 0x0d)
+  if(RxBuf[0] == 'I' && RxBuf[1] == 'D' && RxBuf[76] == 0x0d)
   {
-      TempInt2 = _atoi(&RxBuf[3]);     
+        uint8_t output[OUTPUT_SIZE] = {0};
+
+      hex_string_to_bytes(RxBuf+2,OUT);
+      //TempInt2 = _atoi(&RxBuf[3]);     
       HAL_FLASH_Unlock();
       /* Fill EraseInit structure*/
       EraseInitStruct.TypeErase = FLASH_TYPEERASE_PAGES;    //1k            
@@ -870,9 +905,35 @@ static FLASH_EraseInitTypeDef EraseInitStruct;
         {
           while(1){}
         }
+#if 0
         if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD, FLASH_USER_START_ADDR, TempInt2) != HAL_OK)
         {
           while(1){}
+        }
+        
+#endif
+        for (uint32_t i = 0; i < 40; i += 8) 
+        {
+          uint64_t temp = 0;
+          // Pack 8 bytes into a 64-bit value (or fill remaining with 0xFF)
+          for (uint8_t j = 0; j < 8; j++) 
+          {
+            if (i + j < 40) 
+            {
+                temp |= ((uint64_t)OUT[i + j] << (8 * j));
+            }
+            else 
+            {
+                temp |= ((uint64_t)0xFF << (8 * j));  // Fill remaining bytes with 0xFF
+            }
+          }
+          // Program Flash memory with the 64-bit data
+          if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD, FLASH_USER_START_ADDR + i, temp) != HAL_OK) 
+          {
+            // Handle error
+            break;
+          }
+    
         }
         HAL_FLASH_Lock();
       
@@ -880,21 +941,27 @@ static FLASH_EraseInitTypeDef EraseInitStruct;
       
       TxBuf[0] = 'O'; 
       TxBuf[1] = 'K';
+ #if 0
       TxBuf[2] = '=';
       memcpy(MM, (void*)FLASH_USER_START_ADDR,8);
       for(i=0;i<4;i++)
       {
         hextoc(MAC[i],&TxBuf[9-(i*2)],&TxBuf[10-(i*2)]);
       } 
-#if 0
+
       hextoc(MM[0],&TxBuf[9],&TxBuf[10]);
       hextoc(MM[1],&TxBuf[7],&TxBuf[8]);
       hextoc(MM[2],&TxBuf[5],&TxBuf[6]);
       hextoc(MM[3],&TxBuf[3],&TxBuf[4]);
-#endif
+
       TxBuf[11] = 0x0d;
       TxBuf[12] = 0x0a;
       HAL_UART_Transmit(&huart1,TxBuf,13,100);
+ #endif
+     
+      TxBuf[2] = 0x0d;
+      TxBuf[3] = 0x0a;
+      HAL_UART_Transmit(&huart1,TxBuf,4,100);
   }
   else 
   {
@@ -1038,6 +1105,24 @@ void hex_to_string(uint8_t* msg, size_t msg_sz, uint8_t* hex, size_t hex_sz)
 }
 #endif
 
+
+
+// Function to convert a single hex character to a numeric value
+uint8_t hex_char_to_value(char c) {
+    if (c >= '0' && c <= '9') return c - '0';         // Convert '0'-'9' to 0-9
+    if (c >= 'A' && c <= 'F') return c - 'A' + 10;    // Convert 'A'-'F' to 10-15
+    if (c >= 'a' && c <= 'f') return c - 'a' + 10;    // Convert 'a'-'f' to 10-15
+    return 0; // Should never reach here if input is valid
+}
+
+// Function to convert 76-character hex string to 37-byte array
+void hex_string_to_bytes(const char input[INPUT_SIZE], uint8_t output[OUTPUT_SIZE]) {
+    for (int i = 0; i < OUTPUT_SIZE; i++) {
+        uint8_t high = hex_char_to_value(input[2 * i]);       // Convert first hex digit
+        uint8_t low = hex_char_to_value(input[2 * i + 1]);    // Convert second hex digit
+        output[i] = (high << 4) | low;  // Combine into one byte
+    }
+}
 
 
 /* USER CODE END 4 */
