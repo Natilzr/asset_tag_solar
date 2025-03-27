@@ -108,10 +108,14 @@ void hex_string_to_bytes(const char input[INPUT_SIZE], uint8_t output[OUTPUT_SIZ
 //float Humi;
 uint8_t Temp[2];
 uint8_t Humi[2];
+
+#define ROLING_TIME     450
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+uint8_t                 UUID_num;
+uint32_t                elapsed_time;
   uint8_t		timeout_cnt;
 static adv_pdu_struct AdvPayload;
   uint8_t		pdu_length;
@@ -217,6 +221,7 @@ uint8_t ble_adv_pdu_HYUMI[] =
   int main(void)
 {
   /* USER CODE BEGIN 1 */
+
   uint16_t stat;
     GPIO_InitTypeDef GPIO_InitStruct;
 #ifndef IBtemp
@@ -226,6 +231,8 @@ uint8_t ble_adv_pdu_HYUMI[] =
     SENSOR = 0;
     ERROR_F = 0;
     stat = 0;
+    elapsed_time = 0;
+    UUID_num = 0;
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -281,11 +288,7 @@ uint8_t ble_adv_pdu_HYUMI[] =
   GetMM();
 #endif
   
-  for(int8_t a=0;a<7;a++)
-  {
-    M = *((uint8_t*)(FLASH_USER_START_ADDR+5-a));
-    MAC[a]=M;
-  }
+
  // memcpy(MAC, (uint8_t*)FLASH_USER_START_ADDR,BD_ADDR_SIZE);
 #ifndef SHIPREK
 #ifndef IBtemp
@@ -391,6 +394,16 @@ uint8_t ble_adv_pdu_HYUMI[] =
   /* USER CODE BEGIN WHILE */
   while (1)
   { 
+    if(elapsed_time++ > ROLING_TIME)
+    {
+      elapsed_time = 0;
+      BC7161_inital();
+      if(UUID_num++ > 24)
+      {
+        UUID_num = 0;
+
+      }
+    }
 #ifndef IBtemp
 #if defined(IBEACON)
     if(SENSOR!=0)
@@ -490,12 +503,16 @@ void SystemClock_Config(void)
 void BC7161_inital()
 {
   uint8_t i;
- 	BC7161_InterfaceConfigure();
+  for(int8_t a=0;a<7;a++)
+  {
+    M = *((uint8_t*)((UUID_num*40)+FLASH_USER_START_ADDR+5-a));
+    MAC[a]=M;
+  }
+  BC7161_InterfaceConfigure();
 	//DelayXmSec(50*4);		//50ms	
         //HAL_Delay(200);
  
-        delay_us_Sleep(25000);	
-      
+  delay_us_Sleep(25000);	    
 	BC7161_wakeup();
         BC7161_page_read_register(CHIPID_REG,&AdvPayload.adv_data[0],3);	
         BC7161_register_setup();
@@ -512,7 +529,7 @@ for(i=0;i<6;i++)//0-5
           pdu_length = sizeof(ble_adv_pdu_IBEACON)+ADV_ADDR_SIZE;       
          AdvPayload.header.bits.length = pdu_length;
           //memcpy(AdvPayload.adv_data,ble_adv_pdu_IBEACON,sizeof(ble_adv_pdu_IBEACON));
-         memcpy(AdvPayload.adv_data,(uint8_t*)(FLASH_USER_START_ADDR+6),31);
+         memcpy(AdvPayload.adv_data,(uint8_t*)(FLASH_USER_START_ADDR+6+(UUID_num*40)),31);
         }
         else 
         {
@@ -831,6 +848,7 @@ static FLASH_EraseInitTypeDef EraseInitStruct;
     uint32_t TempInt2=0;
     uint8_t *Ptx;
     uint8_t i = 0;
+    uint8_t eraised = 0;
     HAL_StatusTypeDef ret;
     uint8_t MM[8];
     TxBuf[0] = 'M';
@@ -857,8 +875,8 @@ static FLASH_EraseInitTypeDef EraseInitStruct;
       TxBuf[1] = 'U';
       TxBuf[2] = ':';
       HAL_UART_Transmit(&huart1,TxBuf,3,100);
-            HAL_Delay(2);
-          for(i=0;i<62;i+=2)
+      HAL_Delay(2);
+      for(i=0;i<62;i+=2)
     {
       hextoc(*Ptx,&TxBuf[0],&TxBuf[1]);
             Ptx++;
@@ -885,26 +903,33 @@ static FLASH_EraseInitTypeDef EraseInitStruct;
       TxBuf[12] = 0x0a;
       HAL_UART_Transmit(&huart1,TxBuf,13,100);
 #endif
+      TxBuf[0] = '\r';
+      HAL_UART_Transmit(&huart1,TxBuf,1,100);
+      HAL_Delay(1);
 //  while(ret != HAL_OK)
  // {
-    ret = HAL_UART_Receive(&huart1,RxBuf,77,4000);
+      for(int8_t R=0;R<24;R++)//24 numbers in memmory
+      {
+        ret = HAL_UART_Receive(&huart1,RxBuf,77,4000);
   //}
-  if(RxBuf[0] == 'I' && RxBuf[1] == 'D' && RxBuf[76] == 0x0d)
-  {
-        uint8_t output[OUTPUT_SIZE] = {0};
-
-      hex_string_to_bytes(RxBuf+2,OUT);
-      //TempInt2 = _atoi(&RxBuf[3]);     
-      HAL_FLASH_Unlock();
-      /* Fill EraseInit structure*/
-      EraseInitStruct.TypeErase = FLASH_TYPEERASE_PAGES;    //1k            
-      EraseInitStruct.PageAddress = FLASH_USER_START_ADDR;
-      EraseInitStruct.NbPages = 1;//(FLASH_USER_END_ADDR - FLASH_USER_START_ADDR) / FLASH_PAGE_SIZE;
-      
-        if (HAL_FLASHEx_Erase(&EraseInitStruct, &PageError) != HAL_OK)
+        if(RxBuf[0] == 'I' && RxBuf[1] == 'D' && RxBuf[76] == 0x0d)
         {
-          while(1){}
-        }
+          uint8_t output[OUTPUT_SIZE] = {0};
+          hex_string_to_bytes(RxBuf+2,OUT);
+          //TempInt2 = _atoi(&RxBuf[3]);     
+          HAL_FLASH_Unlock();
+          /* Fill EraseInit structure*/
+          if(eraised == 0)
+          {
+            EraseInitStruct.TypeErase = FLASH_TYPEERASE_PAGES;    //1k            
+            EraseInitStruct.PageAddress = FLASH_USER_START_ADDR;
+            EraseInitStruct.NbPages = 1;//(FLASH_USER_END_ADDR - FLASH_USER_START_ADDR) / FLASH_PAGE_SIZE;
+            if (HAL_FLASHEx_Erase(&EraseInitStruct, &PageError) != HAL_OK)
+            {
+              while(1){}
+            }
+            eraised = 1;
+          }
 #if 0
         if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD, FLASH_USER_START_ADDR, TempInt2) != HAL_OK)
         {
@@ -928,7 +953,7 @@ static FLASH_EraseInitTypeDef EraseInitStruct;
             }
           }
           // Program Flash memory with the 64-bit data
-          if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD, FLASH_USER_START_ADDR + i, temp) != HAL_OK) 
+          if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD, FLASH_USER_START_ADDR + i + (R*40), temp) != HAL_OK) 
           {
             // Handle error
             break;
@@ -938,9 +963,12 @@ static FLASH_EraseInitTypeDef EraseInitStruct;
         HAL_FLASH_Lock();
       
       
-      
+      memset(RxBuf,0,77);
       TxBuf[0] = 'O'; 
       TxBuf[1] = 'K';
+      TxBuf[2] = '\r';
+      HAL_UART_Transmit(&huart1,TxBuf,3,100);
+      HAL_Delay(2);
  #if 0
       TxBuf[2] = '=';
       memcpy(MM, (void*)FLASH_USER_START_ADDR,8);
@@ -959,9 +987,10 @@ static FLASH_EraseInitTypeDef EraseInitStruct;
       HAL_UART_Transmit(&huart1,TxBuf,13,100);
  #endif
      
-      TxBuf[2] = 0x0d;
-      TxBuf[3] = 0x0a;
-      HAL_UART_Transmit(&huart1,TxBuf,4,100);
+    //  TxBuf[2] = 0x0d;
+    //  TxBuf[3] = 0x0a;
+    //  HAL_UART_Transmit(&huart1,TxBuf,4,100);
+
   }
   else 
   {
@@ -972,10 +1001,18 @@ static FLASH_EraseInitTypeDef EraseInitStruct;
       TxBuf[4] = 0x0d;
       TxBuf[5] = 0x0a;
       HAL_UART_Transmit(&huart1,TxBuf,6,100);
+      return;
   }
     
-  }
-  
+  }//end of loop
+      TxBuf[0] = 'D'; 
+      TxBuf[1] = 'O';
+      TxBuf[2] = 'N';
+      TxBuf[3] = 'E';      
+      TxBuf[4] = 0x0d;
+      TxBuf[5] = 0x0a;
+      HAL_UART_Transmit(&huart1,TxBuf,6,100);
+}
   
   /**
  * _atoi - Converts a string to an integer.
