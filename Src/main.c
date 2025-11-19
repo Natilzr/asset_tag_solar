@@ -54,10 +54,10 @@
 
 uint8_t g_BDdaddr[BD_ADDR_SIZE];
 uint8_t TagID[4];
-  uint32_t Address = 0, PageError = 0;
-  
+uint32_t Address = 0, PageError = 0;
+
 //#define IBtemp 1
-  #define INPUT_SIZE 76
+#define INPUT_SIZE 76
 #define OUTPUT_SIZE 37
 /* USER CODE END PD */
 
@@ -90,17 +90,17 @@ void BC7161_inital(void);
 void BeaconSend(void);
 void RTC_Init(void);
 static void RTC_AlarmConfig(void);
-void   GPIO_SLEEP(void);
+void GPIO_SLEEP(void);
 void BC7161_wakeupAndSamp(void);
 void GetMac(void);
-void PduTimeUpdate(uint32_t *count,uint32_t *time);
+void PduTimeUpdate(uint32_t* count, uint32_t* time);
 void UartTest(void);
-uint32_t _atoi(uint8_t *s);
+uint32_t _atoi(uint8_t* s);
 void GetMM(void);
 void LedOn(void);
 void LedOff(void);
 uint8_t itoa(uint8_t i);
-void hextoc(uint8_t hex,uint8_t* msb,uint8_t* lsb);
+void hextoc(uint8_t hex, uint8_t* msb, uint8_t* lsb);
 void hex_string_to_bytes(const char input[INPUT_SIZE], uint8_t output[OUTPUT_SIZE]);
 //uint16_t Temp;
 //uint16_t Humi;
@@ -109,24 +109,25 @@ void hex_string_to_bytes(const char input[INPUT_SIZE], uint8_t output[OUTPUT_SIZ
 uint8_t Temp[2];
 uint8_t Humi[2];
 
-#define ROLING_TIME     450
+//#define ROLING_TIME     450//15min
+#define ROLING_TIME     12600//7hours
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-uint8_t                 UUID_num;
-uint32_t                elapsed_time;
-  uint8_t		timeout_cnt;
+uint8_t UUID_num;
+uint32_t elapsed_time;
+uint8_t timeout_cnt;
 static adv_pdu_struct AdvPayload;
-  uint8_t		pdu_length;
+uint8_t pdu_length;
 
-  uint8_t       ERROR_F;
-#ifndef IBtemp
-  //for TLM
-  uint32_t      PDU_Count;
-  uint32_t      PDU_time;
-  
-  uint8_t ble_adv_pdu_TLM[]=
+uint8_t ERROR_F;
+# ifndef IBtemp
+//for TLM
+uint32_t PDU_Count;
+uint32_t PDU_time;
+uint8_t BatLvl;
+uint8_t ble_adv_pdu_TLM[] =
 {
 0x02,0x01,0x06,
 0x03,// Length
@@ -203,26 +204,26 @@ uint8_t ble_adv_pdu_HYUMI[] =
 
 };
 #endif
-    uint8_t MAC[6];
-    uint32_t ADC_VAL;
-    uint16_t ADC_VAL16;
-    uint8_t SENSOR;
-   // int16_t val;
-      uint8_t val[2];
-      uint8_t MN[2];
-      uint8_t MJ[2];
-      uint8_t M;
+uint8_t MAC[6];
+uint32_t ADC_VAL;
+uint16_t ADC_VAL16;
+uint8_t SENSOR;
+// int16_t val;
+uint8_t val[2];
+uint8_t MN[2];
+uint8_t MJ[2];
+uint8_t M;
 /* USER CODE END 0 */
 
 /**
   * @brief  The application entry point.
   * @retval int
   */
-  int main(void)
+int main(void)
 {
-  /* USER CODE BEGIN 1 */
+    /* USER CODE BEGIN 1 */
 
-  uint16_t stat;
+    uint16_t stat;
     GPIO_InitTypeDef GPIO_InitStruct;
 #ifndef IBtemp
     PDU_Count = 0;//0x1f40;//0;
@@ -233,39 +234,40 @@ uint8_t ble_adv_pdu_HYUMI[] =
     stat = 0;
     elapsed_time = 0;
     UUID_num = 0;
-  /* USER CODE END 1 */
+    uint8_t* e;
+    /* USER CODE END 1 */
 
-  /* MCU Configuration--------------------------------------------------------*/
+    /* MCU Configuration--------------------------------------------------------*/
 
-  /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
-  HAL_Init();
+    /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
+    HAL_Init();
 
-  /* USER CODE BEGIN Init */
+    /* USER CODE BEGIN Init */
 
-  /* USER CODE END Init */
+    /* USER CODE END Init */
 
-  /* Configure the system clock */
-  SystemClock_Config();
+    /* Configure the system clock */
+    SystemClock_Config();
 
-  /* USER CODE BEGIN SysInit */
+    /* USER CODE BEGIN SysInit */
 
-  /* USER CODE END SysInit */
+    /* USER CODE END SysInit */
 
-  /* Initialize all configured peripherals */
-  MX_GPIO_Init();
-  //MX_I2C1_Init();
-  MX_USART1_UART_Init();
-  MX_RTC_Init();
-  MX_ADC_Init();
-  MX_TIM14_Init();
-  MX_TIM3_Init();
-  SENSOR = 0;
-  /* USER CODE BEGIN 2 */
-  HAL_ADCEx_Calibration_Start(&hadc);
-  HAL_TIM_Base_Start(&htim3);
-  //GetMac();
-  #ifndef SHIPREK
-  memcpy(MAC, (void*)SM32F0xx_EL_SIGN_ADDRESS,BD_ADDR_SIZE);
+    /* Initialize all configured peripherals */
+    MX_GPIO_Init();
+    //MX_I2C1_Init();
+    MX_USART1_UART_Init();
+    MX_RTC_Init();
+    MX_ADC_Init();
+    MX_TIM14_Init();
+    MX_TIM3_Init();
+    SENSOR = 0;
+    /* USER CODE BEGIN 2 */
+    HAL_ADCEx_Calibration_Start(&hadc);
+    HAL_TIM_Base_Start(&htim3);
+    //GetMac();
+# ifndef SHIPREK
+    memcpy(MAC, (void*)SM32F0xx_EL_SIGN_ADDRESS, BD_ADDR_SIZE);
 #else
 #if 0
   MAC[5] = 0xCB;
@@ -281,77 +283,78 @@ uint8_t ble_adv_pdu_HYUMI[] =
   MAC[2] = 0x12;
   MAC[1] = 0xC4;
   MAC[0] = 0x6D;
-  #endif
 #endif
-  UartTest();
+#endif
+
+    UartTest();
 #if 0
   GetMM();
 #endif
-  
 
- // memcpy(MAC, (uint8_t*)FLASH_USER_START_ADDR,BD_ADDR_SIZE);
-#ifndef SHIPREK
-#ifndef IBtemp
-  ble_adv_pdu_IBEACON[25] = MJ[1];
-  ble_adv_pdu_IBEACON[26] = MJ[0];
-  ble_adv_pdu_IBEACON[27] = MN[1];
-  ble_adv_pdu_IBEACON[28] = MN[0];
+
+    // memcpy(MAC, (uint8_t*)FLASH_USER_START_ADDR,BD_ADDR_SIZE);
+# ifndef SHIPREK
+# ifndef IBtemp
+    ble_adv_pdu_IBEACON[25] = MJ[1];
+    ble_adv_pdu_IBEACON[26] = MJ[0];
+    ble_adv_pdu_IBEACON[27] = MN[1];
+    ble_adv_pdu_IBEACON[28] = MN[0];
 #else
-  ble_adv_pdu_HYUMI[13] = MJ[1];
-  ble_adv_pdu_HYUMI[14] = MJ[0];
-  ble_adv_pdu_HYUMI[15] = MN[1];
-  ble_adv_pdu_HYUMI[16] = MN[0];
+    ble_adv_pdu_HYUMI[13] = MJ[1];
+    ble_adv_pdu_HYUMI[14] = MJ[0];
+    ble_adv_pdu_HYUMI[15] = MN[1];
+    ble_adv_pdu_HYUMI[16] = MN[0];
 #endif
 #endif SHIPREK
-  HAL_UART_MspDeInit(&huart1);
-  MX_I2C1_Init();
-  
-  //test
-#ifdef IBtemp
+    HAL_UART_MspDeInit(&huart1);
+    MX_I2C1_Init();
 
-   SHT3X_ClearAllAlertFlags();
-   SHT3X_ReadStatus(&stat);
-   SHT3X_GetTempAndHumiPollingDirect(&Temp,&Humi,
-                                    REPEATAB_LOW,
-                                    10);
-#endif  
-   
-  //test end
-//#if 0
-   
+    //test
+# ifdef IBtemp
 
-   
-  #ifndef IBtemp
-  if(Max317267_WriteRegister(ConfigurationReg,2,0x81) == HAL_OK)
-  {
-    SENSOR = 1;//sensor is MAX report external only
-      if(Max317267_ReadRegister(TempReg,2,val) != HAL_OK)
-      {
-        ERROR_F = 1;
-        //error reading
-      }
-  }  
-  else if(STDS75_WriteRegister(ConfigurationReg,2,0x40) == HAL_OK)
-  {
-    SENSOR = 2;//senor is STDS75 internal 
-      if(STDS75_ReadRegister(TempReg,2,val)== HAL_TIMEOUT)
-      {
-        ERROR_F = 1;
-        //error reading
-      }     
-      if(STDS75_WriteRegister(ConfigurationReg,2,0x41) != HAL_OK)
-      {
-        ERROR_F = 1;
-         //error reading       
-      }
+    SHT3X_ClearAllAlertFlags();
+    SHT3X_ReadStatus(&stat);
+    SHT3X_GetTempAndHumiPollingDirect(&Temp, &Humi,
+                                     REPEATAB_LOW,
+                                     10);
+#endif
 
-  }
-  
-  else
-  {
-    HAL_I2C_MspDeInit(&hi2c1);
-  }
-  #endif 
+    //test end
+    //#if 0
+
+
+
+# ifndef IBtemp
+    if (Max317267_WriteRegister(ConfigurationReg, 2, 0x81) == HAL_OK)
+    {
+        SENSOR = 1;//sensor is MAX report external only
+        if (Max317267_ReadRegister(TempReg, 2, val) != HAL_OK)
+        {
+            ERROR_F = 1;
+            //error reading
+        }
+    }
+    else if (STDS75_WriteRegister(ConfigurationReg, 2, 0x40) == HAL_OK)
+    {
+        SENSOR = 2;//senor is STDS75 internal 
+        if (STDS75_ReadRegister(TempReg, 2, val) == HAL_TIMEOUT)
+        {
+            ERROR_F = 1;
+            //error reading
+        }
+        if (STDS75_WriteRegister(ConfigurationReg, 2, 0x41) != HAL_OK)
+        {
+            ERROR_F = 1;
+            //error reading       
+        }
+
+    }
+
+    else
+    {
+        HAL_I2C_MspDeInit(&hi2c1);
+    }
+#endif
 #if 0
     if(SENSOR == 1) 
     {
@@ -382,46 +385,47 @@ uint8_t ble_adv_pdu_HYUMI[] =
       HAL_I2C_MspDeInit(&hi2c1);
   }
 #endif
- // #endif
-  
-  if(ERROR_F == 1)
-    while(1){}
-  RTC_Init();
-  BC7161_inital();
-  /* USER CODE END 2 */
+    // #endif
 
-  /* Infinite loop */
-  /* USER CODE BEGIN WHILE */
-  while (1)
-  { 
-    if(elapsed_time++ > ROLING_TIME)
+    if (ERROR_F == 1)
+        while (1) { }
+    RTC_Init();
+    BC7161_inital();
+    /* USER CODE END 2 */
+
+    /* Infinite loop */
+    /* USER CODE BEGIN WHILE */
+    while (1)
     {
-      elapsed_time = 0;
-      BC7161_inital();
-      if(UUID_num++ > 24)
-      {
-        UUID_num = 0;
+        if (elapsed_time++ > ROLING_TIME)
+        {
+            elapsed_time = 0;
+            BC7161_inital();
+            if (UUID_num++ > 22)
+            {
+                UUID_num = 0;
 
-      }
-    }
-#ifndef IBtemp
+            }
+        }
+# ifndef IBtemp
 #if defined(IBEACON)
     if(SENSOR!=0)
 #endif
 
-    {
-#ifndef SHIPREK
-        PduTimeUpdate(&PDU_Count,&PDU_time);
+        {
+# ifndef SHIPREK
+            PduTimeUpdate(&PDU_Count, &PDU_time);
 #endif  //SHIPREK
-    }
+        }
 #endif
+
         BeaconSend();
         LED_GPIO_Port->BSRR = LED_Pin;
         GPIO_SLEEP();
 
         HAL_SuspendTick();
         HAL_PWR_EnterSTOPMode(PWR_LOWPOWERREGULATOR_ON, PWR_SLEEPENTRY_WFI);
-        /* Clear PWR wake up Flag */    
+        /* Clear PWR wake up Flag */
         HAL_ResumeTick();
         __HAL_RCC_GPIOF_CLK_ENABLE();
         __HAL_RCC_GPIOA_CLK_ENABLE();
@@ -429,24 +433,24 @@ uint8_t ble_adv_pdu_HYUMI[] =
         __HAL_RCC_TIM14_CLK_ENABLE();
         __HAL_RCC_ADC1_CLK_ENABLE();
         __HAL_RCC_I2C1_CLK_ENABLE();
-    /* USER CODE END WHILE */
+        /* USER CODE END WHILE */
 
-    /* USER CODE BEGIN 3 */
-        
-    GPIO_InitStruct.Pin = GPIO_PIN_1;
-    GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
-    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
-    
-    while(HAL_GPIO_ReadPin(GPIOB,GPIO_PIN_1) == GPIO_PIN_SET)
-    {
-       BC7161_inital();
+        /* USER CODE BEGIN 3 */
+
+        GPIO_InitStruct.Pin = GPIO_PIN_1;
+        GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+        GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+        GPIO_InitStruct.Pull = GPIO_NOPULL;
+        HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+        while (HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_1) == GPIO_PIN_SET)
+        {
+            BC7161_inital();
+        }
+
+
     }
-   
-
-  }
-  /* USER CODE END 3 */
+    /* USER CODE END 3 */
 }
 
 /**
@@ -455,45 +459,45 @@ uint8_t ble_adv_pdu_HYUMI[] =
   */
 void SystemClock_Config(void)
 {
-  RCC_OscInitTypeDef RCC_OscInitStruct = {0};
-  RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
-  RCC_PeriphCLKInitTypeDef PeriphClkInit = {0};
+    RCC_OscInitTypeDef RCC_OscInitStruct = { 0 };
+    RCC_ClkInitTypeDef RCC_ClkInitStruct = { 0 };
+    RCC_PeriphCLKInitTypeDef PeriphClkInit = { 0 };
 
-  /** Initializes the CPU, AHB and APB busses clocks 
-  */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI|RCC_OSCILLATORTYPE_HSI14
-                              |RCC_OSCILLATORTYPE_LSI;
-  RCC_OscInitStruct.HSIState = RCC_HSI_ON;
-  RCC_OscInitStruct.HSI14State = RCC_HSI14_ON;
-  RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
-  RCC_OscInitStruct.HSI14CalibrationValue = 16;
-  RCC_OscInitStruct.LSIState = RCC_LSI_ON;
-  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
-  if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /** Initializes the CPU, AHB and APB busses clocks 
-  */
-  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
-                              |RCC_CLOCKTYPE_PCLK1;
-  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_HSI;
-  RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
+    /** Initializes the CPU, AHB and APB busses clocks 
+    */
+    RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI | RCC_OSCILLATORTYPE_HSI14
+                                | RCC_OSCILLATORTYPE_LSI;
+    RCC_OscInitStruct.HSIState = RCC_HSI_ON;
+    RCC_OscInitStruct.HSI14State = RCC_HSI14_ON;
+    RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
+    RCC_OscInitStruct.HSI14CalibrationValue = 16;
+    RCC_OscInitStruct.LSIState = RCC_LSI_ON;
+    RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
+    if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
+    {
+        Error_Handler();
+    }
+    /** Initializes the CPU, AHB and APB busses clocks 
+    */
+    RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK
+                                | RCC_CLOCKTYPE_PCLK1;
+    RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_HSI;
+    RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
+    RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_0) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_USART1|RCC_PERIPHCLK_I2C1
-                              |RCC_PERIPHCLK_RTC;
-  PeriphClkInit.Usart1ClockSelection = RCC_USART1CLKSOURCE_PCLK1;
-  PeriphClkInit.I2c1ClockSelection = RCC_I2C1CLKSOURCE_HSI;
-  PeriphClkInit.RTCClockSelection = RCC_RTCCLKSOURCE_LSI;
-  if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
-  {
-    Error_Handler();
-  }
+    if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_0) != HAL_OK)
+    {
+        Error_Handler();
+    }
+    PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_USART1 | RCC_PERIPHCLK_I2C1
+                                | RCC_PERIPHCLK_RTC;
+    PeriphClkInit.Usart1ClockSelection = RCC_USART1CLKSOURCE_PCLK1;
+    PeriphClkInit.I2c1ClockSelection = RCC_I2C1CLKSOURCE_HSI;
+    PeriphClkInit.RTCClockSelection = RCC_RTCCLKSOURCE_LSI;
+    if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
+    {
+        Error_Handler();
+    }
 }
 
 /* USER CODE BEGIN 4 */
@@ -502,27 +506,27 @@ void SystemClock_Config(void)
 /*---------------------------------------------------------------------------*/
 void BC7161_inital()
 {
-  uint8_t i;
-  for(int8_t a=0;a<7;a++)
-  {
-    M = *((uint8_t*)((UUID_num*40)+FLASH_USER_START_ADDR+5-a));
-    MAC[a]=M;
-  }
-  BC7161_InterfaceConfigure();
-	//DelayXmSec(50*4);		//50ms	
-        //HAL_Delay(200);
- 
-  delay_us_Sleep(25000);	    
-	BC7161_wakeup();
-        BC7161_page_read_register(CHIPID_REG,&AdvPayload.adv_data[0],3);	
-        BC7161_register_setup();
-	BC7161_LIRC_calibration();
-	AdvPayload.header.value = ADV_NONCONN_IND;					/* adv type = ADV_NONCONN_IND */
-for(i=0;i<6;i++)//0-5
-{
+    uint8_t i;
+    for (int8_t a = 0; a < 7; a++)
+    {
+        M = *((uint8_t*)((UUID_num * 40) + FLASH_USER_START_ADDR + 5 - a));
+        MAC[a] = M;
+    }
+    BC7161_InterfaceConfigure();
+    //DelayXmSec(50*4);		//50ms	
+    //HAL_Delay(200);
+
+    delay_us_Sleep(25000);
+    BC7161_wakeup();
+    BC7161_page_read_register(CHIPID_REG, &AdvPayload.adv_data[0], 3);
+    BC7161_register_setup();
+    BC7161_LIRC_calibration();
+    AdvPayload.header.value = ADV_NONCONN_IND;                  /* adv type = ADV_NONCONN_IND */
+    for (i = 0; i < 6; i++)//0-5
+    {
         AdvPayload.adv_addr[i] = MAC[i];
-}
-#ifndef IBtemp
+    }
+# ifndef IBtemp
 #if defined(IBEACON)
         if(SENSOR == 0)
         {
@@ -534,14 +538,14 @@ for(i=0;i<6;i++)//0-5
         else 
         {
 #endif
-          pdu_length = sizeof(ble_adv_pdu_TLM)+ADV_ADDR_SIZE;
-          AdvPayload.header.bits.length = pdu_length;
-          memcpy(AdvPayload.adv_data,ble_adv_pdu_TLM,sizeof(ble_adv_pdu_TLM));
-          /*ADDED FOR ios TO READ mac*/
- for(i=0;i<6;i++)//0-5
- {
-   AdvPayload.adv_data[30-i] = MAC[i];
- }
+    pdu_length = sizeof(ble_adv_pdu_TLM) + ADV_ADDR_SIZE;
+    AdvPayload.header.bits.length = pdu_length;
+    memcpy(AdvPayload.adv_data, ble_adv_pdu_TLM, sizeof(ble_adv_pdu_TLM));
+    /*ADDED FOR ios TO READ mac*/
+    for (i = 0; i < 6; i++)//0-5
+    {
+        AdvPayload.adv_data[30 - i] = MAC[i];
+    }
 #if 0
         AdvPayload.adv_data[25] = MAC[5];
         AdvPayload.adv_data[26] = MAC[4];
@@ -554,55 +558,55 @@ for(i=0;i<6;i++)//0-5
         }	
 #endif
 #else
-         pdu_length = sizeof(ble_adv_pdu_HYUMI)+ADV_ADDR_SIZE;       
-         AdvPayload.header.bits.length = pdu_length;
-         memcpy(AdvPayload.adv_data,ble_adv_pdu_HYUMI,sizeof(ble_adv_pdu_HYUMI)); 
-        
+    pdu_length = sizeof(ble_adv_pdu_HYUMI) + ADV_ADDR_SIZE;
+    AdvPayload.header.bits.length = pdu_length;
+    memcpy(AdvPayload.adv_data, ble_adv_pdu_HYUMI, sizeof(ble_adv_pdu_HYUMI));
+
 #endif
 }
 
 
 void BeaconSend(void)
 {
-  uint8_t ret = 0;
-  uint16_t Timout = 200;
- // GPIO_InitTypeDef GPIO_InitStruct;
-  /* wake up BC7161 */
-  //BC7161_wakeup();
-  BC7161_wakeupAndSamp();
-  /* write adv data to BC7161 FIFO */
-  LED_GPIO_Port->BRR =LED_Pin;//LedOn();
-  if(BC7161_write_pdu_fifo((uint8_t *)&AdvPayload,pdu_length+ADV_HEADER_SIZE) == 0x03)
-  {
-    /* trigger TX start,0x81(CH37),0x83(CH37,CH38),0x87(CH37,CH38,CH39) */
-    ret = BC7161_TriggerAdvStart(ADV_CHANNEL);
-    if(ret == 0)
+    uint8_t ret = 0;
+    uint16_t Timout = 200;
+    // GPIO_InitTypeDef GPIO_InitStruct;
+    /* wake up BC7161 */
+    //BC7161_wakeup();
+    BC7161_wakeupAndSamp();
+    /* write adv data to BC7161 FIFO */
+    LED_GPIO_Port->BRR = LED_Pin;//LedOn();
+    if (BC7161_write_pdu_fifo((uint8_t*)&AdvPayload, pdu_length + ADV_HEADER_SIZE) == 0x03)
     {
+        /* trigger TX start,0x81(CH37),0x83(CH37,CH38),0x87(CH37,CH38,CH39) */
+        ret = BC7161_TriggerAdvStart(ADV_CHANNEL);
+        if (ret == 0)
+        {
 
-      while(1)
-      {
-        LED_GPIO_Port->BRR =LED_Pin;//LedOn();
-        LED_GPIO_Port->BSRR = LED_Pin;
-      }
-    }
-    while(HAL_GPIO_ReadPin(GPIOB,GPIO_PIN_1) == GPIO_PIN_RESET)
-    {
-      if(Timout-- == 0)
-      {
-       BC7161_inital();
-       break;
-      }
+            while (1)
+            {
+                LED_GPIO_Port->BRR = LED_Pin;//LedOn();
+                LED_GPIO_Port->BSRR = LED_Pin;
+            }
+        }
+        while (HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_1) == GPIO_PIN_RESET)
+        {
+            if (Timout-- == 0)
+            {
+                BC7161_inital();
+                break;
+            }
+        }
+
     }
 
-  }
-            
-  timeout_cnt=TIMEOUT_COUNTER;	//Tony	 20190919
-  
+    timeout_cnt = TIMEOUT_COUNTER;  //Tony	 20190919
+
 }
 
 
 
-void HAL_RTC_AlarmAEventCallback(RTC_HandleTypeDef *hrtc)
+void HAL_RTC_AlarmAEventCallback(RTC_HandleTypeDef* hrtc)
 {
 #if 0
  //  
@@ -613,24 +617,24 @@ void HAL_RTC_AlarmAEventCallback(RTC_HandleTypeDef *hrtc)
   }
   //
 #endif
-RTC->WPR = 0xCA; /* (1) */
-RTC->WPR = 0x53; /* (1) */
-RTC->ISR |= RTC_ISR_INIT; /* (2) */
-while ((RTC->ISR & RTC_ISR_INITF) != RTC_ISR_INITF) /* (3) */
-{
-/* add time out here for a robust application */
+    RTC->WPR = 0xCA; /* (1) */
+    RTC->WPR = 0x53; /* (1) */
+    RTC->ISR |= RTC_ISR_INIT; /* (2) */
+    while ((RTC->ISR & RTC_ISR_INITF) != RTC_ISR_INITF) /* (3) */
+    {
+        /* add time out here for a robust application */
+    }
+    RTC->TR = 0; /* (5) */
+    RTC->ISR &= ~RTC_ISR_INIT; /* (6) */
+    RTC->WPR = 0xFE; /* (7) */
+    RTC->WPR = 0x64; /* (7) */
+
+
+    //HAL_GPIO_TogglePin(GPIOA,GPIO_PIN_1);
+
 }
-RTC->TR = 0; /* (5) */
-RTC->ISR &=~ RTC_ISR_INIT; /* (6) */
-RTC->WPR = 0xFE; /* (7) */
-RTC->WPR = 0x64; /* (7) */
 
-
-  //HAL_GPIO_TogglePin(GPIOA,GPIO_PIN_1);
-   
-}
-
-void   GPIO_SLEEP(void)
+void GPIO_SLEEP(void)
 {
     GPIO_InitTypeDef GPIO_InitStruct;
 
@@ -641,29 +645,29 @@ void   GPIO_SLEEP(void)
     GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
-    GPIO_InitStruct.Pin =  GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_3|GPIO_PIN_6|GPIO_PIN_7|GPIO_PIN_8;//|GPIO_PIN_9|GPIO_PIN_10;//|GPIO_PIN_13|GPIO_PIN_14;//|GPIO_PIN_9|GPIO_PIN_10;//|GPIO_PIN_13|GPIO_PIN_14;
+    GPIO_InitStruct.Pin = GPIO_PIN_0 | GPIO_PIN_1 | GPIO_PIN_2 | GPIO_PIN_3 | GPIO_PIN_6 | GPIO_PIN_7 | GPIO_PIN_8;//|GPIO_PIN_9|GPIO_PIN_10;//|GPIO_PIN_13|GPIO_PIN_14;//|GPIO_PIN_9|GPIO_PIN_10;//|GPIO_PIN_13|GPIO_PIN_14;
     HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
     GPIO_InitStruct.Pin = GPIO_PIN_1;
     HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
-    
-/* 
-    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
-    GPIO_InitStruct.Pin =  GPIO_PIN_0|GPIO_PIN_1;
-    HAL_GPIO_Init(GPIOF, &GPIO_InitStruct);
-    HAL_GPIO_WritePin(GPIOF,GPIO_PIN_1|GPIO_PIN_0,GPIO_PIN_RESET);
-*/
- //   HAL_GPIO_Init(GPIOF, &GPIO_InitStruct);
+
+    /* 
+        GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
+        GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+        GPIO_InitStruct.Pull = GPIO_NOPULL;
+        GPIO_InitStruct.Pin =  GPIO_PIN_0|GPIO_PIN_1;
+        HAL_GPIO_Init(GPIOF, &GPIO_InitStruct);
+        HAL_GPIO_WritePin(GPIOF,GPIO_PIN_1|GPIO_PIN_0,GPIO_PIN_RESET);
+    */
+    //   HAL_GPIO_Init(GPIOF, &GPIO_InitStruct);
 
 
-  /* Disable GPIOs clock */
-  __HAL_RCC_GPIOA_CLK_DISABLE();
-  __HAL_RCC_GPIOB_CLK_DISABLE();
-  __HAL_RCC_GPIOF_CLK_DISABLE();
-  __HAL_RCC_I2C1_CLK_DISABLE();
-  __HAL_RCC_ADC1_CLK_DISABLE();
-  __HAL_RCC_TIM14_CLK_DISABLE();
+    /* Disable GPIOs clock */
+    __HAL_RCC_GPIOA_CLK_DISABLE();
+    __HAL_RCC_GPIOB_CLK_DISABLE();
+    __HAL_RCC_GPIOF_CLK_DISABLE();
+    __HAL_RCC_I2C1_CLK_DISABLE();
+    __HAL_RCC_ADC1_CLK_DISABLE();
+    __HAL_RCC_TIM14_CLK_DISABLE();
 }
 #if 0
 
@@ -687,59 +691,62 @@ void GetMac(void)
 }
 #endif
 void BC7161_wakeupAndSamp(void)
-{       
-        uint16_t    hyumi = 0;
-        HAL_ADC_Start(&hadc);
-        uint32_t h;
-        uint16_t                pres;
-#ifndef IBtemp
-        if(SENSOR==1)
+{
+    uint16_t hyumi = 0;
+    HAL_ADC_Start(&hadc);
+    uint32_t h;
+    uint16_t pres;
+# ifndef IBtemp
+#if 0
+    if (SENSOR == 1)
+    {
+        if (Max317267_ReadRegister(TempReg, 2, val) != HAL_OK)
         {
-          if(Max317267_ReadRegister(TempReg,2,val) != HAL_OK)
-          {
-          }
+        }
 
-        }
-        if(SENSOR==2)
+    }
+    if (SENSOR == 2)
+    {
+        if (STDS75_ReadRegister(TempReg, 2, val) != HAL_OK)
         {
-           if(STDS75_ReadRegister(TempReg,2,val) != HAL_OK)
-            {
-                      ERROR_F = 1;
-            }
-           if(STDS75_WriteRegister(ConfigurationReg,2,0x40) != HAL_OK) //turn on sensor
-            {
-                      ERROR_F = 1;
-            }
+            ERROR_F = 1;
         }
-#else
-        //hyumi sensor 
-        SHT3X_GetTempAndHumiPollingDirect(&Temp,&Humi,
-                                    REPEATAB_LOW,
-                                    10);
-        
+        if (STDS75_WriteRegister(ConfigurationReg, 2, 0x40) != HAL_OK) //turn on sensor
+        {
+            ERROR_F = 1;
+        }
+    }
 #endif
-        h = (uint32_t)Humi[1] + (uint32_t)(Humi[0] << 8); 
-        h = h * 100;
-      //  hyumi  = Humi[0];
-       // hyumi +=  (Humi[1] << 8); 
-       // hyumi = hyumi / 655;
-        h = h / 65535;
-        hyumi = (uint16_t)h ;
-       
-      
-        //hyumi = hyumi / 65535;
-	SCL_RESET();				/* SCL = low */
-	//delay_us(800);			/* delay 2ms */	
-        delay_us_Sleep(200);
+#else
+    //hyumi sensor 
+    SHT3X_GetTempAndHumiPollingDirect(&Temp, &Humi,
+                                REPEATAB_LOW,
+                                10);
 
-        HAL_ADC_PollForConversion(&hadc,10);
- 
-        ADC_VAL = HAL_ADC_GetValue(&hadc);
-        ADC_VAL16 = ADC_VAL & 0xffff;
-        ADC_VAL16 = ADC_VAL16 * 1.46;
-        //ADC_VAL16 += 70;
-#ifndef IBtemp
+#endif
+    h = (uint32_t)Humi[1] + (uint32_t)(Humi[0] << 8);
+    h = h * 100;
+    //  hyumi  = Humi[0];
+    // hyumi +=  (Humi[1] << 8); 
+    // hyumi = hyumi / 655;
+    h = h / 65535;
+    hyumi = (uint16_t)h;
+
+
+    //hyumi = hyumi / 65535;
+    SCL_RESET();                /* SCL = low */
+                                //delay_us(800);			/* delay 2ms */	
+    delay_us_Sleep(200);
+
+    HAL_ADC_PollForConversion(&hadc, 10);
+
+    ADC_VAL = HAL_ADC_GetValue(&hadc);
+    ADC_VAL16 = ADC_VAL & 0xffff;
+    ADC_VAL16 = ADC_VAL16 * 1.46;
+    //ADC_VAL16 += 70;
+# ifndef IBtemp
 #if defined(IBEACON)
+
         if(SENSOR==0)
         {
                 if(ADC_VAL16 > 4100) pres = 100;
@@ -756,10 +763,10 @@ void BC7161_wakeupAndSamp(void)
                 else if(ADC_VAL16 > 3300) pres = 60;
                 else if(ADC_VAL16 > 3000) pres = 50;
                 else if(ADC_VAL16 > 2800) pres = 30;
-#ifndef SHIPREK
+# ifndef SHIPREK
                 AdvPayload.adv_data[29]=0;
 #endif  //SHIPREK
-        }
+}
         else
         {  
 #endif
@@ -774,9 +781,11 @@ void BC7161_wakeupAndSamp(void)
             AdvPayload.adv_data[15]=0xd3;//val[0]; fixed
             AdvPayload.adv_data[16]=0x00;//val[0]; fixed
           }
+
 #if defined(IBEACON)
         }
 #endif
+#if 0
         if(SENSOR==2)
         {
           if(STDS75_WriteRegister(ConfigurationReg,2,0x41) != HAL_OK) //turn off sensor shdn when finish converting 
@@ -790,6 +799,7 @@ void BC7161_wakeupAndSamp(void)
           }
           
         }
+#endif
 #else
         if(ADC_VAL16 > 4100) pres = 100;
         else if(ADC_VAL16 > 4100) pres = 97;
@@ -815,45 +825,57 @@ void BC7161_wakeupAndSamp(void)
           AdvPayload.adv_data[28]=hyumi >> 8;         
           AdvPayload.adv_data[29]=0;
 #endif
+          
+          ///battery handling
+        if(ADC_VAL16 > 3800) BatLvl = 0x00;//high
+        else if(ADC_VAL16 > 3700) BatLvl = 0x40;
+        else if(ADC_VAL16 > 3500) BatLvl = 0x80;
+        else BatLvl = 0xc0;
+        AdvPayload.adv_data[6] &= 0x3F;
+        AdvPayload.adv_data[6] |= BatLvl;
         SCL_SET();
 
 }
 #ifndef IBtemp
-void PduTimeUpdate(uint32_t *count,uint32_t *time)
+void PduTimeUpdate(uint32_t* count, uint32_t* time)
 {
-      uint8_t *vp;
-        *count = *count+1;
-        *time = *time + 8;
-        vp = (uint8_t *)&PDU_Count;
-        AdvPayload.adv_data[17] = vp[3];
-        AdvPayload.adv_data[18] = vp[2];
-        AdvPayload.adv_data[19] = vp[1];
-        AdvPayload.adv_data[20] = vp[0];
-        vp = (uint8_t *)&PDU_time;
-        AdvPayload.adv_data[21] = vp[3];
-        AdvPayload.adv_data[22] = vp[2];
-        AdvPayload.adv_data[23] = vp[1];
-        AdvPayload.adv_data[24] = vp[0];
+    uint8_t* vp;
+    *count = *count + 1;
+    *time = *time + 8;
+    vp = (uint8_t*)&PDU_Count;
+    AdvPayload.adv_data[17] = vp[3];
+    AdvPayload.adv_data[18] = vp[2];
+    AdvPayload.adv_data[19] = vp[1];
+    AdvPayload.adv_data[20] = vp[0];
+    vp = (uint8_t*)&PDU_time;
+    AdvPayload.adv_data[21] = vp[3];
+    AdvPayload.adv_data[22] = vp[2];
+    AdvPayload.adv_data[23] = vp[1];
+    AdvPayload.adv_data[24] = vp[0];
 }
 #endif
 
 void UartTest(void)
 {
     /*Variable used for Erase procedure*/
-static FLASH_EraseInitTypeDef EraseInitStruct;
-//uint8_t i;
+    static FLASH_EraseInitTypeDef EraseInitStruct;
+    //uint8_t i;
     uint8_t TxBuf[20];
     uint8_t RxBuf[78];
     uint8_t OUT[37];
-    uint32_t TempInt2=0;
-    uint8_t *Ptx;
+    uint32_t TempInt2 = 0;
+    uint8_t* Ptx;
     uint8_t i = 0;
     uint8_t eraised = 0;
     HAL_StatusTypeDef ret;
     uint8_t MM[8];
+
+
+
     TxBuf[0] = 'M';
     TxBuf[1] = ':';
-    Ptx = (uint8_t*)FLASH_USER_START_ADDR;
+    Ptx = (void*)(SM32F0xx_EL_SIGN_ADDRESS + 5);
+    //Ptx = (uint8_t*)FLASH_USER_START_ADDR;
 #if 0    
     for(i=0;i<6;i++)
     {
@@ -862,26 +884,27 @@ static FLASH_EraseInitTypeDef EraseInitStruct;
     }
   TxBuf[14] = ',';
 #endif
-  HAL_UART_Transmit(&huart1,TxBuf,2,100);
-            HAL_Delay(2);
-      for(i=0;i<12;i+=2)
+    HAL_UART_Transmit(&huart1, TxBuf, 2, 100);
+    HAL_Delay(2);
+    for (i = 0; i < 12; i += 2)
     {
-      hextoc(*Ptx,&TxBuf[0],&TxBuf[1]);
-            Ptx++;
-            HAL_UART_Transmit(&huart1,TxBuf,2,100);
-            HAL_Delay(2);
+        hextoc(*Ptx, &TxBuf[0], &TxBuf[1]);
+        Ptx--;
+        HAL_UART_Transmit(&huart1, TxBuf, 2, 100);
+        HAL_Delay(2);
     }
-      TxBuf[0] = ',';
-      TxBuf[1] = 'U';
-      TxBuf[2] = ':';
-      HAL_UART_Transmit(&huart1,TxBuf,3,100);
-      HAL_Delay(2);
-      for(i=0;i<62;i+=2)
+    Ptx = (uint8_t*)FLASH_USER_START_ADDR;
+    TxBuf[0] = ',';
+    TxBuf[1] = 'U';
+    TxBuf[2] = ':';
+    HAL_UART_Transmit(&huart1, TxBuf, 3, 100);
+    HAL_Delay(2);
+    for (i = 0; i < 74; i += 2)
     {
-      hextoc(*Ptx,&TxBuf[0],&TxBuf[1]);
-            Ptx++;
-            HAL_UART_Transmit(&huart1,TxBuf,2,100);
-            HAL_Delay(2);
+        hextoc(*Ptx, &TxBuf[0], &TxBuf[1]);
+        Ptx++;
+        HAL_UART_Transmit(&huart1, TxBuf, 2, 100);
+        HAL_Delay(2);
     }
 #if 0
   memcpy(MM, (void*)FLASH_USER_START_ADDR,8);
@@ -903,33 +926,33 @@ static FLASH_EraseInitTypeDef EraseInitStruct;
       TxBuf[12] = 0x0a;
       HAL_UART_Transmit(&huart1,TxBuf,13,100);
 #endif
-      TxBuf[0] = '\r';
-      HAL_UART_Transmit(&huart1,TxBuf,1,100);
-      HAL_Delay(1);
-//  while(ret != HAL_OK)
- // {
-      for(int8_t R=0;R<24;R++)//24 numbers in memmory
-      {
-        ret = HAL_UART_Receive(&huart1,RxBuf,77,4000);
-  //}
-        if(RxBuf[0] == 'I' && RxBuf[1] == 'D' && RxBuf[76] == 0x0d)
+    TxBuf[0] = '\r';
+    HAL_UART_Transmit(&huart1, TxBuf, 1, 100);
+    HAL_Delay(1);
+    //  while(ret != HAL_OK)
+    // {
+    for (int8_t R = 0; R < 22; R++)//24 numbers in memmory
+    {
+        ret = HAL_UART_Receive(&huart1, RxBuf, 77, 4000);
+        //}
+        if (RxBuf[0] == 'I' && RxBuf[1] == 'D' && RxBuf[76] == 0x0d)
         {
-          uint8_t output[OUTPUT_SIZE] = {0};
-          hex_string_to_bytes(RxBuf+2,OUT);
-          //TempInt2 = _atoi(&RxBuf[3]);     
-          HAL_FLASH_Unlock();
-          /* Fill EraseInit structure*/
-          if(eraised == 0)
-          {
-            EraseInitStruct.TypeErase = FLASH_TYPEERASE_PAGES;    //1k            
-            EraseInitStruct.PageAddress = FLASH_USER_START_ADDR;
-            EraseInitStruct.NbPages = 1;//(FLASH_USER_END_ADDR - FLASH_USER_START_ADDR) / FLASH_PAGE_SIZE;
-            if (HAL_FLASHEx_Erase(&EraseInitStruct, &PageError) != HAL_OK)
+            uint8_t output[OUTPUT_SIZE] = { 0 };
+            hex_string_to_bytes(RxBuf + 2, OUT);
+            //TempInt2 = _atoi(&RxBuf[3]);     
+            HAL_FLASH_Unlock();
+            /* Fill EraseInit structure*/
+            if (eraised == 0)
             {
-              while(1){}
+                EraseInitStruct.TypeErase = FLASH_TYPEERASE_PAGES;    //1k            
+                EraseInitStruct.PageAddress = FLASH_USER_START_ADDR;
+                EraseInitStruct.NbPages = 1;//(FLASH_USER_END_ADDR - FLASH_USER_START_ADDR) / FLASH_PAGE_SIZE;
+                if (HAL_FLASHEx_Erase(&EraseInitStruct, &PageError) != HAL_OK)
+                {
+                    while (1) { }
+                }
+                eraised = 1;
             }
-            eraised = 1;
-          }
 #if 0
         if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD, FLASH_USER_START_ADDR, TempInt2) != HAL_OK)
         {
@@ -937,39 +960,39 @@ static FLASH_EraseInitTypeDef EraseInitStruct;
         }
         
 #endif
-        for (uint32_t i = 0; i < 40; i += 8) 
-        {
-          uint64_t temp = 0;
-          // Pack 8 bytes into a 64-bit value (or fill remaining with 0xFF)
-          for (uint8_t j = 0; j < 8; j++) 
-          {
-            if (i + j < 40) 
+            for (uint32_t i = 0; i < 40; i += 8)
             {
-                temp |= ((uint64_t)OUT[i + j] << (8 * j));
+                uint64_t temp = 0;
+                // Pack 8 bytes into a 64-bit value (or fill remaining with 0xFF)
+                for (uint8_t j = 0; j < 8; j++)
+                {
+                    if (i + j < 40)
+                    {
+                        temp |= ((uint64_t)OUT[i + j] << (8 * j));
+                    }
+                    else
+                    {
+                        temp |= ((uint64_t)0xFF << (8 * j));  // Fill remaining bytes with 0xFF
+                    }
+                }
+                // Program Flash memory with the 64-bit data
+                if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD, FLASH_USER_START_ADDR + i + (R * 40), temp) != HAL_OK)
+                {
+                    // Handle error
+                    break;
+                }
+
             }
-            else 
-            {
-                temp |= ((uint64_t)0xFF << (8 * j));  // Fill remaining bytes with 0xFF
-            }
-          }
-          // Program Flash memory with the 64-bit data
-          if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD, FLASH_USER_START_ADDR + i + (R*40), temp) != HAL_OK) 
-          {
-            // Handle error
-            break;
-          }
-    
-        }
-        HAL_FLASH_Lock();
-      
-      
-      memset(RxBuf,0,77);
-      TxBuf[0] = 'O'; 
-      TxBuf[1] = 'K';
-      TxBuf[2] = '\r';
-      HAL_UART_Transmit(&huart1,TxBuf,3,100);
-      HAL_Delay(2);
- #if 0
+            HAL_FLASH_Lock();
+
+
+            memset(RxBuf, 0, 77);
+            TxBuf[0] = 'O';
+            TxBuf[1] = 'K';
+            TxBuf[2] = '\r';
+            HAL_UART_Transmit(&huart1, TxBuf, 3, 100);
+            HAL_Delay(2);
+#if 0
       TxBuf[2] = '=';
       memcpy(MM, (void*)FLASH_USER_START_ADDR,8);
       for(i=0;i<4;i++)
@@ -985,61 +1008,62 @@ static FLASH_EraseInitTypeDef EraseInitStruct;
       TxBuf[11] = 0x0d;
       TxBuf[12] = 0x0a;
       HAL_UART_Transmit(&huart1,TxBuf,13,100);
- #endif
-     
-    //  TxBuf[2] = 0x0d;
-    //  TxBuf[3] = 0x0a;
-    //  HAL_UART_Transmit(&huart1,TxBuf,4,100);
+#endif
 
-  }
-  else 
-  {
-      TxBuf[0] = 'T'; 
-      TxBuf[1] = 'I';
-      TxBuf[2] = 'M';
-      TxBuf[3] = 'E';      
-      TxBuf[4] = 0x0d;
-      TxBuf[5] = 0x0a;
-      HAL_UART_Transmit(&huart1,TxBuf,6,100);
-      return;
-  }
-    
-  }//end of loop
-      TxBuf[0] = 'D'; 
-      TxBuf[1] = 'O';
-      TxBuf[2] = 'N';
-      TxBuf[3] = 'E';      
-      TxBuf[4] = 0x0d;
-      TxBuf[5] = 0x0a;
-      HAL_UART_Transmit(&huart1,TxBuf,6,100);
+            //  TxBuf[2] = 0x0d;
+            //  TxBuf[3] = 0x0a;
+            //  HAL_UART_Transmit(&huart1,TxBuf,4,100);
+
+        }
+        else
+        {
+            TxBuf[0] = 'T';
+            TxBuf[1] = 'I';
+            TxBuf[2] = 'M';
+            TxBuf[3] = 'E';
+            TxBuf[4] = 0x0d;
+            TxBuf[5] = 0x0a;
+            HAL_UART_Transmit(&huart1, TxBuf, 6, 100);
+            return;
+        }
+
+    }//end of loop
+    TxBuf[0] = 'D';
+    TxBuf[1] = 'O';
+    TxBuf[2] = 'N';
+    TxBuf[3] = 'E';
+    TxBuf[4] = 0x0d;
+    TxBuf[5] = 0x0a;
+    HAL_UART_Transmit(&huart1, TxBuf, 6, 100);
 }
-  
-  /**
- * _atoi - Converts a string to an integer.
- * @s: The string to be converted.
- *
- * Return: The integer value of the converted string.
- */
-uint32_t _atoi(uint8_t *s)
+
+/**
+* _atoi - Converts a string to an integer.
+* @s: The string to be converted.
+*
+* Return: The integer value of the converted string.
+*/
+uint32_t _atoi(uint8_t* s)
 {
-    
+
     uint32_t num = 0;
-/*
-    do {
-
-        if (*s >= '0' && *s <= '9')
-            num = (num * 10) + (*s - '0');
-
-        else if (num > 0)
-            break;
-    } while (*s++);
-    */
+    /*
         do {
+
+            if (*s >= '0' && *s <= '9')
+                num = (num * 10) + (*s - '0');
+
+            else if (num > 0)
+                break;
+        } while (*s++);
+        */
+    do
+    {
 
         if (*s >= '0' && *s <= '9')
             num = (num * 16) + (*s - '0');
         else if (*s >= 'A' && *s <= 'F')
-            num = (num * 16) + (*s - 'A' + 10);        
+            num = (num * 16) + (*s - 'A' + 10);
         else if (num > 0)
             break;
     } while (*s++);
@@ -1049,20 +1073,20 @@ uint32_t _atoi(uint8_t *s)
 
 void GetMM(void)
 {
-      uint32_t data32=0 ;
-        Address = FLASH_USER_START_ADDR;
-        data32 = *((__IO uint32_t *)Address);
-        MN[0] = (uint8_t)((data32 ) & 0xff);
-        MN[1] = (uint8_t)((data32 >> 8) & 0xff);
-        MJ[0] = (uint8_t)(( data32 >> 16) & 0xff);
-        MJ[1] = (uint8_t)((data32 >>  24) & 0xff);
-        if(MN[0] == 0xff)
-        {
-          MN[0] = 0;
-          MN[1] = 0;
-          MJ[0] = 0;
-          MJ[1] = 0;    
-        }
+    uint32_t data32 = 0;
+    Address = FLASH_USER_START_ADDR;
+    data32 = *((__IO uint32_t *)Address);
+    MN[0] = (uint8_t)((data32) & 0xff);
+    MN[1] = (uint8_t)((data32 >> 8) & 0xff);
+    MJ[0] = (uint8_t)((data32 >> 16) & 0xff);
+    MJ[1] = (uint8_t)((data32 >> 24) & 0xff);
+    if (MN[0] == 0xff)
+    {
+        MN[0] = 0;
+        MN[1] = 0;
+        MJ[0] = 0;
+        MJ[1] = 0;
+    }
 }
 
 #if 0
@@ -1096,35 +1120,35 @@ void LedOff(void)
     LED_GPIO_Port->BSRR = LED_Pin;
 }
 #endif
-void hextoc(uint8_t hex,uint8_t* msb,uint8_t* lsb)
+void hextoc(uint8_t hex, uint8_t* msb, uint8_t* lsb)
 {
-  uint8_t u;
-  uint8_t l;
-  u = (hex & 0xf0)>>4;
-  l = (hex & 0xf);
-  *msb = itoa(u);
-   *lsb = itoa(l);
- 
+    uint8_t u;
+    uint8_t l;
+    u = (hex & 0xf0) >> 4;
+    l = (hex & 0xf);
+    *msb = itoa(u);
+    *lsb = itoa(l);
+
 
 }
 
 uint8_t itoa(uint8_t i)
 {
     if (i <= 9)
-    return i + '0';
-  if (i == 0xa)
-    return 'A';
-  if (i == 0xb)
-    return 'B';
-  if (i == 0x0c)
-    return 'C';
-  if (i == 0x0d)
-    return 'D';
-  if (i == 0x0e)
-    return 'E';
-  if (i == 0x0f)
-    return 'F';
-  return 0;
+        return i + '0';
+    if (i == 0xa)
+        return 'A';
+    if (i == 0xb)
+        return 'B';
+    if (i == 0x0c)
+        return 'C';
+    if (i == 0x0d)
+        return 'D';
+    if (i == 0x0e)
+        return 'E';
+    if (i == 0x0f)
+        return 'F';
+    return 0;
 }
 #if 0
 void hex_to_string(uint8_t* msg, size_t msg_sz, uint8_t* hex, size_t hex_sz)
@@ -1145,7 +1169,8 @@ void hex_to_string(uint8_t* msg, size_t msg_sz, uint8_t* hex, size_t hex_sz)
 
 
 // Function to convert a single hex character to a numeric value
-uint8_t hex_char_to_value(char c) {
+uint8_t hex_char_to_value(char c)
+{
     if (c >= '0' && c <= '9') return c - '0';         // Convert '0'-'9' to 0-9
     if (c >= 'A' && c <= 'F') return c - 'A' + 10;    // Convert 'A'-'F' to 10-15
     if (c >= 'a' && c <= 'f') return c - 'a' + 10;    // Convert 'a'-'f' to 10-15
@@ -1153,8 +1178,10 @@ uint8_t hex_char_to_value(char c) {
 }
 
 // Function to convert 76-character hex string to 37-byte array
-void hex_string_to_bytes(const char input[INPUT_SIZE], uint8_t output[OUTPUT_SIZE]) {
-    for (int i = 0; i < OUTPUT_SIZE; i++) {
+void hex_string_to_bytes(const char input[INPUT_SIZE], uint8_t output[OUTPUT_SIZE])
+{
+    for (int i = 0; i < OUTPUT_SIZE; i++)
+    {
         uint8_t high = hex_char_to_value(input[2 * i]);       // Convert first hex digit
         uint8_t low = hex_char_to_value(input[2 * i + 1]);    // Convert second hex digit
         output[i] = (high << 4) | low;  // Combine into one byte
@@ -1170,10 +1197,10 @@ void hex_string_to_bytes(const char input[INPUT_SIZE], uint8_t output[OUTPUT_SIZ
   */
 void Error_Handler(void)
 {
-  /* USER CODE BEGIN Error_Handler_Debug */
-  /* User can add his own implementation to report the HAL error return state */
+    /* USER CODE BEGIN Error_Handler_Debug */
+    /* User can add his own implementation to report the HAL error return state */
 
-  /* USER CODE END Error_Handler_Debug */
+    /* USER CODE END Error_Handler_Debug */
 }
 
 #ifdef  USE_FULL_ASSERT
@@ -1184,12 +1211,12 @@ void Error_Handler(void)
   * @param  line: assert_param error line source number
   * @retval None
   */
-void assert_failed(uint8_t *file, uint32_t line)
-{ 
-  /* USER CODE BEGIN 6 */
-  /* User can add his own implementation to report the file name and line number,
-     tex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
-  /* USER CODE END 6 */
+void assert_failed(uint8_t* file, uint32_t line)
+{
+    /* USER CODE BEGIN 6 */
+    /* User can add his own implementation to report the file name and line number,
+       tex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
+    /* USER CODE END 6 */
 }
 #endif /* USE_FULL_ASSERT */
 
