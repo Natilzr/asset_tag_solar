@@ -86,6 +86,7 @@ void delay_us (uint16_t us)
 
 void delay_us_Sleep (uint16_t us)
 {
+  //8mHZ / 16 = 500KHZ 2usec
        //    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET);
     htim14.Instance = TIM14;
     htim14.Init.Prescaler = 16;

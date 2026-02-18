@@ -205,6 +205,13 @@ static void RTC_AlarmConfig(void)
   /*##-3- Configure the RTC Alarm peripheral #################################*/
   /* Set Alarm to 02:20:30 
      RTC Alarm Generation: Alarm on Hours, Minutes and Seconds */
+  /*RTC runs on 40K 25us
+  #define RTC_ASYNCH_PREDIV    0x7F     127
+#define RTC_SYNCH_PREDIV     0x00F9     249
+   25us * 127 * 249 ~ 0.7905 sec
+  
+  
+  */ 
   salarmstructure.Alarm = RTC_ALARM_A;
   salarmstructure.AlarmDateWeekDay = RTC_WEEKDAY_MONDAY;
   salarmstructure.AlarmDateWeekDaySel = RTC_ALARMDATEWEEKDAYSEL_DATE;// dont care for date/day
@@ -213,7 +220,9 @@ static void RTC_AlarmConfig(void)
   salarmstructure.AlarmTime.TimeFormat = RTC_HOURFORMAT12_AM;
   salarmstructure.AlarmTime.Hours = 0x02;
   salarmstructure.AlarmTime.Minutes = 0x20;
-  salarmstructure.AlarmTime.Seconds = 0x02;//0x10;//0.8192*6  = 8.2sec
+  salarmstructure.AlarmTime.Seconds = 0x11;//0.8192*6  = 8.2sec
+  salarmstructure.AlarmTime.Seconds = 0x07;//0.8192*6  = 8.2sec
+  //salarmstructure.AlarmTime.Seconds = 0x02;//0x10;//0.8192*6  = 8.2sec
   salarmstructure.AlarmTime.SubSeconds = 0x06F;//0xF9;
   
   if(HAL_RTC_SetAlarm_IT(&hrtc,&salarmstructure,RTC_FORMAT_BCD) != HAL_OK)

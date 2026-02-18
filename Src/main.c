@@ -47,6 +47,10 @@
 #define FLASH_USER_START_ADDR   0x08003C00   /* Start @ of user Flash area */
 #define FLASH_USER_END_ADDR     0x08003F00   /* End @ of user Flash area */
 
+#define SAMPLING_TIME           10*60
+#define TICK_TIME       10
+#define ADC_TIME        SAMPLING_TIME/TICK_TIME
+
 #define         SM32F0xx_EL_SIGN_ADDRESS 0x1FFFF7AC // RM0091 p.933
 #define BD_ADDR_SIZE  (6)
 
@@ -110,7 +114,12 @@ uint8_t Temp[2];
 uint8_t Humi[2];
 
 //#define ROLING_TIME     450//15min
-#define ROLING_TIME     12600//7hours
+//if sending every 6 sec  10  sending is 1 min 
+#define MEASURED_INTERVAL       6//sec
+#define PING_PER_MIN    60/MEASURED_INTERVAL
+#define ROLING_HOURS    7//hours
+#define ROLING_TIME    ROLING_HOURS*60*PING_PER_MIN   //4200
+//#define ROLING_TIME     12600//7hours  for 2 sec
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -121,58 +130,10 @@ uint8_t timeout_cnt;
 static adv_pdu_struct AdvPayload;
 uint8_t pdu_length;
 
-uint8_t ERROR_F;
-# ifndef IBtemp
-//for TLM
-uint32_t PDU_Count;
-uint32_t PDU_time;
 uint8_t BatLvl;
-uint8_t ble_adv_pdu_TLM[] =
-{
-0x02,0x01,0x06,
-0x03,// Length
-0x03,// Param: Service List
-0xAA, 0xFE,  // Eddystone ID
-0X17,//0x11,  // Length
-0x16,  // Service Data
-0xAA, 0xFE, // Eddystone ID
-0x20,  // TLM flag
-0x00, // TLM version
-  /* [13] */ 0x00, 0x00,  // Battery voltage
-  /* [15] */ 0x80, 0x00,  // Beacon temperature
-  /* [17] */ 0x00, 0x00, 0x00, 0x00, // Advertising PDU count
-  /* [21] */ 0x00, 0x00, 0x00, 0x00 ,// Time since reboot
-     /* [25] */ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 // MAC ADDED
-};
 
-#if 0
-uint8_t ble_adv_pdu_IBEACON[] =
-{
-0x02,0x01,0x06,0x1A,0xFF,//0-4
-0x4C,0x00,0x02,0x15,//VENDOR 5-8
-0xFD,0xA5,0x06,0x93,//UUID 9-12
-0xA4,0xE2,//temp13-14
-0x4F,0xB1,0xAF,0xCF,0xC6,0xEB,0x07,0x64,0x78,0x25,//15-24
-0x00,0x00,//major//25-26
-0x00,0x00,//minor27-28
-0xD8
-}; 
-#endif
-#if 0
-//CBBD5EA473E0
-uint8_t ble_adv_pdu_IBEACON[] =
-{
-/*0x02,0x01,0x06,*/0x1E,0xFF,//0-4
-0x4C,0x00,0x12,0x19,//VENDOR 5-8
-0x24,0x7C,0xCF,0x44,
-0x3B,0x08,
-0xAC,0x38,0xC1,0x06,0x8D,0xFE,0x28,0x18,0xD9,0xCE,
-0xA1,0x02,
-0x46,0x17,
-0x8E,0x2C,0xB5,0x03,0x00
-};
 
-#endif
+
 //F1F8DB12C46D
 uint8_t ble_adv_pdu_IBEACON[] =
 {
@@ -186,35 +147,18 @@ uint8_t ble_adv_pdu_IBEACON[] =
 0xD7,0x10,0x42,0x01,0x00
 }; //24147024BEDB11C3DB4ED64F4DCEC71A339C235BD710420100
 
-#else
-uint8_t ble_adv_pdu_HYUMI[] =
-{
-0x02,0x01,0x06,0x1A,0xFF,//0-4
-0x59,0x00,0x02,0x15,//VENDOR 5-8
-//0x4C,0x00,0x02,0x15,//VENDOR 5-8
-0xFD,0xA5,0x06,0x93,//UUID 9-12
-0x00,0x00,//major  13-14
-0x00,0x00,//minor  15-16
-0xd8,//1M TX POWER    17
-0xE2,//BATTERY%       18
-0x00,0x00,0x00,0x00,0x00,0x00,//X,Y,Z 19-24
-0x00,0x00,//TEMPERATURE 25-26
-0x00,0x00,//HYUMIDTY//27-28
-0xb0    // battery 29
 
-};
-#endif
 uint8_t MAC[6];
 uint32_t ADC_VAL;
 uint16_t ADC_VAL16;
-uint8_t SENSOR;
+uint16_t samp_time;
 // int16_t val;
 uint8_t val[2];
 uint8_t MN[2];
 uint8_t MJ[2];
 uint8_t M;
 /* USER CODE END 0 */
-
+//
 /**
   * @brief  The application entry point.
   * @retval int
@@ -225,12 +169,7 @@ int main(void)
 
     uint16_t stat;
     GPIO_InitTypeDef GPIO_InitStruct;
-#ifndef IBtemp
-    PDU_Count = 0;//0x1f40;//0;
-    PDU_time = 0;//0xfa00;//0;
-#endif
-    SENSOR = 0;
-    ERROR_F = 0;
+
     stat = 0;
     elapsed_time = 0;
     UUID_num = 0;
@@ -261,134 +200,13 @@ int main(void)
     MX_ADC_Init();
     MX_TIM14_Init();
     MX_TIM3_Init();
-    SENSOR = 0;
     /* USER CODE BEGIN 2 */
     HAL_ADCEx_Calibration_Start(&hadc);
     HAL_TIM_Base_Start(&htim3);
-    //GetMac();
-# ifndef SHIPREK
-    memcpy(MAC, (void*)SM32F0xx_EL_SIGN_ADDRESS, BD_ADDR_SIZE);
-#else
-#if 0
-  MAC[5] = 0xCB;
-  MAC[4] = 0xBD;
-  MAC[3] = 0x5E;
-  MAC[2] = 0xA4;
-  MAC[1] = 0x73;
-  MAC[0] = 0xE0;
-
-    MAC[5] = 0xF1;
-  MAC[4] = 0xF8;
-  MAC[3] = 0xDB;
-  MAC[2] = 0x12;
-  MAC[1] = 0xC4;
-  MAC[0] = 0x6D;
-#endif
-#endif
-
-    UartTest();
-#if 0
-  GetMM();
-#endif
-
-
-    // memcpy(MAC, (uint8_t*)FLASH_USER_START_ADDR,BD_ADDR_SIZE);
-# ifndef SHIPREK
-# ifndef IBtemp
-    ble_adv_pdu_IBEACON[25] = MJ[1];
-    ble_adv_pdu_IBEACON[26] = MJ[0];
-    ble_adv_pdu_IBEACON[27] = MN[1];
-    ble_adv_pdu_IBEACON[28] = MN[0];
-#else
-    ble_adv_pdu_HYUMI[13] = MJ[1];
-    ble_adv_pdu_HYUMI[14] = MJ[0];
-    ble_adv_pdu_HYUMI[15] = MN[1];
-    ble_adv_pdu_HYUMI[16] = MN[0];
-#endif
-#endif SHIPREK
+    UartTest();// config service
     HAL_UART_MspDeInit(&huart1);
     MX_I2C1_Init();
-
-    //test
-# ifdef IBtemp
-
-    SHT3X_ClearAllAlertFlags();
-    SHT3X_ReadStatus(&stat);
-    SHT3X_GetTempAndHumiPollingDirect(&Temp, &Humi,
-                                     REPEATAB_LOW,
-                                     10);
-#endif
-
-    //test end
-    //#if 0
-
-
-
-# ifndef IBtemp
-    if (Max317267_WriteRegister(ConfigurationReg, 2, 0x81) == HAL_OK)
-    {
-        SENSOR = 1;//sensor is MAX report external only
-        if (Max317267_ReadRegister(TempReg, 2, val) != HAL_OK)
-        {
-            ERROR_F = 1;
-            //error reading
-        }
-    }
-    else if (STDS75_WriteRegister(ConfigurationReg, 2, 0x40) == HAL_OK)
-    {
-        SENSOR = 2;//senor is STDS75 internal 
-        if (STDS75_ReadRegister(TempReg, 2, val) == HAL_TIMEOUT)
-        {
-            ERROR_F = 1;
-            //error reading
-        }
-        if (STDS75_WriteRegister(ConfigurationReg, 2, 0x41) != HAL_OK)
-        {
-            ERROR_F = 1;
-            //error reading       
-        }
-
-    }
-
-    else
-    {
-        HAL_I2C_MspDeInit(&hi2c1);
-    }
-#endif
-#if 0
-    if(SENSOR == 1) 
-    {
-      if(Max317267_ReadRegister(TempReg,2,val) != HAL_OK)
-      {
-        ERROR_F = 1;
-        //error reading
-      }
-    }
-    else if(SENSOR == 2)
-    {
-      if(STDS75_ReadRegister(TempReg,2,val)== HAL_TIMEOUT)
-      {
-        ERROR_F = 1;
-        //error reading
-      }     
-      if(STDS75_WriteRegister(ConfigurationReg,2,0x41) != HAL_OK)
-      {
-        ERROR_F = 1;
-         //error reading       
-      }
-    
-  }
-#endif
-#if 0
-  if(SENSOR==0)
-  {
-      HAL_I2C_MspDeInit(&hi2c1);
-  }
-#endif
-    // #endif
-
-    if (ERROR_F == 1)
-        while (1) { }
+    samp_time = 2;//sample battery after 2 advertizing
     RTC_Init();
     BC7161_inital();
     /* USER CODE END 2 */
@@ -404,23 +222,24 @@ int main(void)
             if (UUID_num++ > 22)
             {
                 UUID_num = 0;
-
             }
         }
-# ifndef IBtemp
-#if defined(IBEACON)
-    if(SENSOR!=0)
-#endif
 
-        {
-# ifndef SHIPREK
-            PduTimeUpdate(&PDU_Count, &PDU_time);
-#endif  //SHIPREK
-        }
-#endif
 
         BeaconSend();
+#ifdef LED
         LED_GPIO_Port->BSRR = LED_Pin;
+#endif
+        
+#ifdef  PA
+        //delay_us_Sleep(20000);
+        delay_us_Sleep(4000);
+        GPIOA->BRR = GPIO_PIN_0;
+        delay_us_Sleep(9100);
+        GPIOA->BSRR = GPIO_PIN_0;
+        delay_us_Sleep(4500);
+        GPIOA->BRR = GPIO_PIN_0;
+#endif
         GPIO_SLEEP();
 
         HAL_SuspendTick();
@@ -526,43 +345,14 @@ void BC7161_inital()
     {
         AdvPayload.adv_addr[i] = MAC[i];
     }
-# ifndef IBtemp
-#if defined(IBEACON)
-        if(SENSOR == 0)
-        {
-          pdu_length = sizeof(ble_adv_pdu_IBEACON)+ADV_ADDR_SIZE;       
-         AdvPayload.header.bits.length = pdu_length;
-          //memcpy(AdvPayload.adv_data,ble_adv_pdu_IBEACON,sizeof(ble_adv_pdu_IBEACON));
-         memcpy(AdvPayload.adv_data,(uint8_t*)(FLASH_USER_START_ADDR+6+(UUID_num*40)),31);
-        }
-        else 
-        {
-#endif
-    pdu_length = sizeof(ble_adv_pdu_TLM) + ADV_ADDR_SIZE;
-    AdvPayload.header.bits.length = pdu_length;
-    memcpy(AdvPayload.adv_data, ble_adv_pdu_TLM, sizeof(ble_adv_pdu_TLM));
-    /*ADDED FOR ios TO READ mac*/
-    for (i = 0; i < 6; i++)//0-5
-    {
-        AdvPayload.adv_data[30 - i] = MAC[i];
-    }
-#if 0
-        AdvPayload.adv_data[25] = MAC[5];
-        AdvPayload.adv_data[26] = MAC[4];
-        AdvPayload.adv_data[27] = MAC[3];
-        AdvPayload.adv_data[28] = MAC[2];
-        AdvPayload.adv_data[29] = MAC[1];
-        AdvPayload.adv_data[30] = MAC[0];
-#endif
-#if defined(IBEACON)
-        }	
-#endif
-#else
-    pdu_length = sizeof(ble_adv_pdu_HYUMI) + ADV_ADDR_SIZE;
-    AdvPayload.header.bits.length = pdu_length;
-    memcpy(AdvPayload.adv_data, ble_adv_pdu_HYUMI, sizeof(ble_adv_pdu_HYUMI));
 
-#endif
+        
+    pdu_length = sizeof(ble_adv_pdu_IBEACON)+ADV_ADDR_SIZE;       
+    AdvPayload.header.bits.length = pdu_length;
+          //memcpy(AdvPayload.adv_data,ble_adv_pdu_IBEACON,sizeof(ble_adv_pdu_IBEACON));
+    memcpy(AdvPayload.adv_data,(uint8_t*)(FLASH_USER_START_ADDR+6+(UUID_num*40)),31);
+        
+
 }
 
 
@@ -573,9 +363,13 @@ void BeaconSend(void)
     // GPIO_InitTypeDef GPIO_InitStruct;
     /* wake up BC7161 */
     //BC7161_wakeup();
-    BC7161_wakeupAndSamp();
+
+      BC7161_wakeupAndSamp();
+
     /* write adv data to BC7161 FIFO */
+#ifdef LED    
     LED_GPIO_Port->BRR = LED_Pin;//LedOn();
+#endif
     if (BC7161_write_pdu_fifo((uint8_t*)&AdvPayload, pdu_length + ADV_HEADER_SIZE) == 0x03)
     {
         /* trigger TX start,0x81(CH37),0x83(CH37,CH38),0x87(CH37,CH38,CH39) */
@@ -585,8 +379,10 @@ void BeaconSend(void)
 
             while (1)
             {
+  
                 LED_GPIO_Port->BRR = LED_Pin;//LedOn();
                 LED_GPIO_Port->BSRR = LED_Pin;
+
             }
         }
         while (HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_1) == GPIO_PIN_RESET)
@@ -597,7 +393,14 @@ void BeaconSend(void)
                 break;
             }
         }
-
+#ifdef PA
+    GPIOA->BSRR = GPIO_PIN_0;
+#endif
+    }
+    else
+    {
+      while(1)
+      {}
     }
 
     timeout_cnt = TIMEOUT_COUNTER;  //Tony	 20190919
@@ -608,15 +411,7 @@ void BeaconSend(void)
 
 void HAL_RTC_AlarmAEventCallback(RTC_HandleTypeDef* hrtc)
 {
-#if 0
- //  
-     if(HAL_RTC_SetTime(&RtcHandle,&stimestructure,RTC_FORMAT_BCD) != HAL_OK)
-  {
-    /* Initialization Error */
-    Error_Handler(); 
-  }
-  //
-#endif
+
     RTC->WPR = 0xCA; /* (1) */
     RTC->WPR = 0x53; /* (1) */
     RTC->ISR |= RTC_ISR_INIT; /* (2) */
@@ -645,19 +440,11 @@ void GPIO_SLEEP(void)
     GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
-    GPIO_InitStruct.Pin = GPIO_PIN_0 | GPIO_PIN_1 | GPIO_PIN_2 | GPIO_PIN_3 | GPIO_PIN_6 | GPIO_PIN_7 | GPIO_PIN_8;//|GPIO_PIN_9|GPIO_PIN_10;//|GPIO_PIN_13|GPIO_PIN_14;//|GPIO_PIN_9|GPIO_PIN_10;//|GPIO_PIN_13|GPIO_PIN_14;
+    GPIO_InitStruct.Pin = GPIO_PIN_1 | GPIO_PIN_2 | GPIO_PIN_3 | GPIO_PIN_6 | GPIO_PIN_7 | GPIO_PIN_8;//|GPIO_PIN_9|GPIO_PIN_10;//|GPIO_PIN_13|GPIO_PIN_14;//|GPIO_PIN_9|GPIO_PIN_10;//|GPIO_PIN_13|GPIO_PIN_14;
     HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
     GPIO_InitStruct.Pin = GPIO_PIN_1;
     HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-    /* 
-        GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
-        GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-        GPIO_InitStruct.Pull = GPIO_NOPULL;
-        GPIO_InitStruct.Pin =  GPIO_PIN_0|GPIO_PIN_1;
-        HAL_GPIO_Init(GPIOF, &GPIO_InitStruct);
-        HAL_GPIO_WritePin(GPIOF,GPIO_PIN_1|GPIO_PIN_0,GPIO_PIN_RESET);
-    */
     //   HAL_GPIO_Init(GPIOF, &GPIO_InitStruct);
 
 
@@ -669,191 +456,74 @@ void GPIO_SLEEP(void)
     __HAL_RCC_ADC1_CLK_DISABLE();
     __HAL_RCC_TIM14_CLK_DISABLE();
 }
-#if 0
 
-uint8_t GPIO_Test(void)
-{
-      GPIO_InitTypeDef GPIO_InitStruct;
-      GPIO_InitStruct.Pin = GPIO_PIN_3;
-      GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-      GPIO_InitStruct.Pull = GPIO_PULLDOWN;
-      HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-      if(HAL_GPIO_ReadPin(GPIOA,GPIO_PIN_3))return 1;
-      return 0;      
-}
-
-#endif
-#if 0
-void GetMac(void)
-{
-      memcpy(MAC, (void*)SM32F0xx_EL_SIGN_ADDRESS,BD_ADDR_SIZE);
-
-}
-#endif
 void BC7161_wakeupAndSamp(void)
 {
-    uint16_t hyumi = 0;
-    HAL_ADC_Start(&hadc);
-    uint32_t h;
-    uint16_t pres;
-# ifndef IBtemp
-#if 0
-    if (SENSOR == 1)
-    {
-        if (Max317267_ReadRegister(TempReg, 2, val) != HAL_OK)
-        {
-        }
+#define ADC_FULL_SCALE     4095U
+#define VREFINT_MV         1200U   // Typical internal reference = 1.200 V
 
-    }
-    if (SENSOR == 2)
-    {
-        if (STDS75_ReadRegister(TempReg, 2, val) != HAL_OK)
-        {
-            ERROR_F = 1;
-        }
-        if (STDS75_WriteRegister(ConfigurationReg, 2, 0x40) != HAL_OK) //turn on sensor
-        {
-            ERROR_F = 1;
-        }
-    }
-#endif
-#else
-    //hyumi sensor 
-    SHT3X_GetTempAndHumiPollingDirect(&Temp, &Humi,
-                                REPEATAB_LOW,
-                                10);
-
-#endif
-    h = (uint32_t)Humi[1] + (uint32_t)(Humi[0] << 8);
-    h = h * 100;
-    //  hyumi  = Humi[0];
-    // hyumi +=  (Humi[1] << 8); 
-    // hyumi = hyumi / 655;
-    h = h / 65535;
-    hyumi = (uint16_t)h;
-
-
+    uint16_t i;
     //hyumi = hyumi / 65535;
-    SCL_RESET();                /* SCL = low */
+
                                 //delay_us(800);			/* delay 2ms */	
-    delay_us_Sleep(200);
 
-    HAL_ADC_PollForConversion(&hadc, 10);
-
-    ADC_VAL = HAL_ADC_GetValue(&hadc);
-    ADC_VAL16 = ADC_VAL & 0xffff;
-    ADC_VAL16 = ADC_VAL16 * 1.46;
-    //ADC_VAL16 += 70;
-# ifndef IBtemp
-#if defined(IBEACON)
-
-        if(SENSOR==0)
-        {
-                if(ADC_VAL16 > 4100) pres = 100;
-                else if(ADC_VAL16 > 4100) pres = 97;
-                else if(ADC_VAL16 > 4050) pres = 95;
-                else if(ADC_VAL16 > 4000) pres = 92;
-                else if(ADC_VAL16 > 3950) pres = 90;
-                else if(ADC_VAL16 > 3900) pres = 85;
- //               else if(ADC_VAL16 > 3800) pres = 82;
-                else if(ADC_VAL16 > 3750) pres = 80;
-//                else if(ADC_VAL16 > 3700) pres = 75;
-                else if(ADC_VAL16 > 3600) pres = 70;
- //               else if(ADC_VAL16 > 3500) pres = 65;
-                else if(ADC_VAL16 > 3300) pres = 60;
-                else if(ADC_VAL16 > 3000) pres = 50;
-                else if(ADC_VAL16 > 2800) pres = 30;
-# ifndef SHIPREK
-                AdvPayload.adv_data[29]=0;
-#endif  //SHIPREK
-}
-        else
-        {  
-#endif
-          
-          AdvPayload.adv_data[14]=ADC_VAL16 & 0xff;//battery
-          AdvPayload.adv_data[13]=ADC_VAL16 >> 8;  
-          AdvPayload.adv_data[16]=val[1];         //temperature
-          AdvPayload.adv_data[15]=val[0];
-              //    tests
-          if(SENSOR==0)
-          {     
-            AdvPayload.adv_data[15]=0xd3;//val[0]; fixed
-            AdvPayload.adv_data[16]=0x00;//val[0]; fixed
-          }
-
-#if defined(IBEACON)
-        }
-#endif
-#if 0
-        if(SENSOR==2)
-        {
-          if(STDS75_WriteRegister(ConfigurationReg,2,0x41) != HAL_OK) //turn off sensor shdn when finish converting 
-          {
-          }
-        }
-        if(SENSOR==1)
-        {
-          if(Max317267_WriteRegister(ConfigurationReg,2,0x81) != HAL_OK)
-          {
-          }
-          
-        }
-#endif
+    if(samp_time-- == 0)
+    {
+#ifdef COIN
+      // Enable VREFINT
+      ADC->CCR |= ADC_CCR_VREFEN;
+      delay_us_Sleep(800);
+      HAL_ADC_Start(&hadc);
+      SCL_RESET();                /* SCL = low */
+      delay_us_Sleep(800);
+      HAL_ADC_PollForConversion(&hadc, 10);
+      ADC->CCR &= ~ADC_CCR_VREFEN;
+      
 #else
-        if(ADC_VAL16 > 4100) pres = 100;
-        else if(ADC_VAL16 > 4100) pres = 97;
-        else if(ADC_VAL16 > 4050) pres = 95;
-        else if(ADC_VAL16 > 4000) pres = 92;
-        else if(ADC_VAL16 > 3950) pres = 90;
-        else if(ADC_VAL16 > 3900) pres = 85;
-        else if(ADC_VAL16 > 3800) pres = 82;
-        else if(ADC_VAL16 > 3750) pres = 80;
-        else if(ADC_VAL16 > 3700) pres = 75;
-        else if(ADC_VAL16 > 3600) pres = 70;
-        else if(ADC_VAL16 > 3500) pres = 65;
-        else if(ADC_VAL16 > 3300) pres = 60;
-        else if(ADC_VAL16 > 3000) pres = 50;
-        else if(ADC_VAL16 > 2800) pres = 30;
-        AdvPayload.adv_data[18]=pres;
-        //hyumi sensor
-          AdvPayload.adv_data[25]=Temp[0];         //temperature
-          AdvPayload.adv_data[26]=Temp[1];
- //         AdvPayload.adv_data[27]=Humi[0];         //humi
- //         AdvPayload.adv_data[28]=Humi[1];
-           AdvPayload.adv_data[27]=hyumi & 0xff;        //humi
-          AdvPayload.adv_data[28]=hyumi >> 8;         
-          AdvPayload.adv_data[29]=0;
+      HAL_ADC_Start(&hadc);
+      SCL_RESET();                /* SCL = low */
+      delay_us_Sleep(800);
+      HAL_ADC_PollForConversion(&hadc, 10);
 #endif
-          
+      ADC_VAL = HAL_ADC_GetValue(&hadc);
+      
+#ifdef COIN
+      ADC_VAL = ADC_VAL - 50;
+      ADC_VAL16 = (uint16_t)((VREFINT_MV * ADC_FULL_SCALE) / ADC_VAL );
+#else
+      
+        ADC_VAL16 = ADC_VAL & 0xffff;
+        ADC_VAL16 = ADC_VAL16 * 1.46;
+#endif
+#ifdef  COIN
+        if(ADC_VAL16 > 3000) BatLvl = 0x00;//high
+        else if(ADC_VAL16 > 2900) BatLvl = 0x40;
+        else if(ADC_VAL16 > 2700) BatLvl = 0x80;
+        else BatLvl = 0xc0;
+#else
           ///battery handling
         if(ADC_VAL16 > 3800) BatLvl = 0x00;//high
         else if(ADC_VAL16 > 3700) BatLvl = 0x40;
         else if(ADC_VAL16 > 3500) BatLvl = 0x80;
         else BatLvl = 0xc0;
+#endif
         AdvPayload.adv_data[6] &= 0x3F;
         AdvPayload.adv_data[6] |= BatLvl;
+        samp_time = ADC_TIME;
+    }
+    else
+    {
+        SCL_RESET();                /* SCL = low */
+delay_us_Sleep(800);
+   
+    }
         SCL_SET();
+        i = 80;
+        while (i--)
+        {
+        }
+}
 
-}
-#ifndef IBtemp
-void PduTimeUpdate(uint32_t* count, uint32_t* time)
-{
-    uint8_t* vp;
-    *count = *count + 1;
-    *time = *time + 8;
-    vp = (uint8_t*)&PDU_Count;
-    AdvPayload.adv_data[17] = vp[3];
-    AdvPayload.adv_data[18] = vp[2];
-    AdvPayload.adv_data[19] = vp[1];
-    AdvPayload.adv_data[20] = vp[0];
-    vp = (uint8_t*)&PDU_time;
-    AdvPayload.adv_data[21] = vp[3];
-    AdvPayload.adv_data[22] = vp[2];
-    AdvPayload.adv_data[23] = vp[1];
-    AdvPayload.adv_data[24] = vp[0];
-}
-#endif
 
 void UartTest(void)
 {
@@ -869,21 +539,10 @@ void UartTest(void)
     uint8_t eraised = 0;
     HAL_StatusTypeDef ret;
     uint8_t MM[8];
-
-
-
     TxBuf[0] = 'M';
     TxBuf[1] = ':';
     Ptx = (void*)(SM32F0xx_EL_SIGN_ADDRESS + 5);
     //Ptx = (uint8_t*)FLASH_USER_START_ADDR;
-#if 0    
-    for(i=0;i<6;i++)
-    {
-      hextoc(MAC[i],&TxBuf[12-(i*2)],&TxBuf[13-(i*2)]);
-
-    }
-  TxBuf[14] = ',';
-#endif
     HAL_UART_Transmit(&huart1, TxBuf, 2, 100);
     HAL_Delay(2);
     for (i = 0; i < 12; i += 2)
@@ -906,26 +565,6 @@ void UartTest(void)
         HAL_UART_Transmit(&huart1, TxBuf, 2, 100);
         HAL_Delay(2);
     }
-#if 0
-  memcpy(MM, (void*)FLASH_USER_START_ADDR,8);
-  for(i=0;i<4;i++)
-  {
-    hextoc(MM[i],&TxBuf[6-(i*2)],&TxBuf[7-(i*2)]);
-  }        
-#if 0
-      hextoc(MM[0],&TxBuf[6],&TxBuf[7]); 
-      hextoc(MM[1],&TxBuf[4],&TxBuf[5]);
-      hextoc(MM[2],&TxBuf[2],&TxBuf[3]);
-      hextoc(MM[3],&TxBuf[0],&TxBuf[1]);
-#endif
-   
-      TxBuf[8] = ',';
-      TxBuf[9] = 'V';
-      TxBuf[10] = '3';
-      TxBuf[11] = 0x0d;
-      TxBuf[12] = 0x0a;
-      HAL_UART_Transmit(&huart1,TxBuf,13,100);
-#endif
     TxBuf[0] = '\r';
     HAL_UART_Transmit(&huart1, TxBuf, 1, 100);
     HAL_Delay(1);
@@ -953,13 +592,6 @@ void UartTest(void)
                 }
                 eraised = 1;
             }
-#if 0
-        if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD, FLASH_USER_START_ADDR, TempInt2) != HAL_OK)
-        {
-          while(1){}
-        }
-        
-#endif
             for (uint32_t i = 0; i < 40; i += 8)
             {
                 uint64_t temp = 0;
@@ -992,27 +624,6 @@ void UartTest(void)
             TxBuf[2] = '\r';
             HAL_UART_Transmit(&huart1, TxBuf, 3, 100);
             HAL_Delay(2);
-#if 0
-      TxBuf[2] = '=';
-      memcpy(MM, (void*)FLASH_USER_START_ADDR,8);
-      for(i=0;i<4;i++)
-      {
-        hextoc(MAC[i],&TxBuf[9-(i*2)],&TxBuf[10-(i*2)]);
-      } 
-
-      hextoc(MM[0],&TxBuf[9],&TxBuf[10]);
-      hextoc(MM[1],&TxBuf[7],&TxBuf[8]);
-      hextoc(MM[2],&TxBuf[5],&TxBuf[6]);
-      hextoc(MM[3],&TxBuf[3],&TxBuf[4]);
-
-      TxBuf[11] = 0x0d;
-      TxBuf[12] = 0x0a;
-      HAL_UART_Transmit(&huart1,TxBuf,13,100);
-#endif
-
-            //  TxBuf[2] = 0x0d;
-            //  TxBuf[3] = 0x0a;
-            //  HAL_UART_Transmit(&huart1,TxBuf,4,100);
 
         }
         else
@@ -1089,37 +700,7 @@ void GetMM(void)
     }
 }
 
-#if 0
-void LedOn(void)
-{
 
-    GPIO_InitTypeDef GPIO_InitStruct;
-    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
-    GPIO_InitStruct.Pin = LED_Pin;
-    HAL_GPIO_Init(LED_GPIO_Port, &GPIO_InitStruct);
-
-    //HAL_GPIO_WritePin(LED_GPIO_Port,LED_Pin,GPIO_PIN_RESET);
-
-    LED_GPIO_Port->BRR =LED_Pin;
-}
-#endif
-#if 0
-void LedOff(void)
-{
-
-    GPIO_InitTypeDef GPIO_InitStruct;
-    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
-    GPIO_InitStruct.Pin = LED_Pin;
-    HAL_GPIO_Init(LED_GPIO_Port, &GPIO_InitStruct);
-
-    //HAL_GPIO_WritePin(LED_GPIO_Port,LED_Pin,GPIO_PIN_SET);
-    LED_GPIO_Port->BSRR = LED_Pin;
-}
-#endif
 void hextoc(uint8_t hex, uint8_t* msb, uint8_t* lsb)
 {
     uint8_t u;
@@ -1150,21 +731,7 @@ uint8_t itoa(uint8_t i)
         return 'F';
     return 0;
 }
-#if 0
-void hex_to_string(uint8_t* msg, size_t msg_sz, uint8_t* hex, size_t hex_sz)
-{
-   memset(msg, '\0', msg_sz);
-   if (hex_sz % 2 != 0 || hex_sz/2 >= msg_sz)
-      return;
 
-   for (int i = 0; i < hex_sz; i+=2)
-   {
-      uint8_t msb = (hex[i+0] <= '9' ? hex[i+0] - '0' : (hex[i+0] & 0x5F) - 'A' + 10);
-      uint8_t lsb = (hex[i+1] <= '9' ? hex[i+1] - '0' : (hex[i+1] & 0x5F) - 'A' + 10);
-      msg[i / 2] = (msb << 4) | lsb;
-   }
-}
-#endif
 
 
 

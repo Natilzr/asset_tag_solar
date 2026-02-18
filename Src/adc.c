@@ -53,8 +53,14 @@ void MX_ADC_Init(void)
   }
   /** Configure for the selected ADC regular channel to be converted. 
   */
+#ifdef COIN
+  sConfig.Channel = ADC_CHANNEL_17;
+  sConfig.Rank = ADC_RANK_CHANNEL_NUMBER;
+#else
+
   sConfig.Channel = ADC_CHANNEL_1;
   sConfig.Rank = ADC_RANK_CHANNEL_NUMBER;
+#endif
   sConfig.SamplingTime = ADC_SAMPLETIME_41CYCLES_5;//ADC_SAMPLETIME_13CYCLES_5;
   if (HAL_ADC_ConfigChannel(&hadc, &sConfig) != HAL_OK)
   {
