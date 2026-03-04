@@ -47,7 +47,7 @@
 #define FLASH_USER_START_ADDR   0x08003C00   /* Start @ of user Flash area */
 #define FLASH_USER_END_ADDR     0x08003F00   /* End @ of user Flash area */
 
-#define SAMPLING_TIME           10*60
+#define SAMPLING_TIME        10//  10*60
 #define TICK_TIME       10
 #define ADC_TIME        SAMPLING_TIME/TICK_TIME
 
@@ -129,7 +129,7 @@ uint32_t elapsed_time;
 uint8_t timeout_cnt;
 static adv_pdu_struct AdvPayload;
 uint8_t pdu_length;
-
+uint32_t LOW_BAT = 0;
 uint8_t BatLvl;
 
 
@@ -167,13 +167,13 @@ int main(void)
 {
     /* USER CODE BEGIN 1 */
 
-    uint16_t stat;
+//    uint16_t stat;
     GPIO_InitTypeDef GPIO_InitStruct;
 
-    stat = 0;
+//    stat = 0;
     elapsed_time = 0;
     UUID_num = 0;
-    uint8_t* e;
+  //  uint8_t* e;
     /* USER CODE END 1 */
 
     /* MCU Configuration--------------------------------------------------------*/
@@ -205,10 +205,11 @@ int main(void)
     HAL_TIM_Base_Start(&htim3);
     UartTest();// config service
     HAL_UART_MspDeInit(&huart1);
-    MX_I2C1_Init();
+//    MX_I2C1_Init();
     samp_time = 2;//sample battery after 2 advertizing
     RTC_Init();
-    BC7161_inital();
+
+     BC7161_inital();
     /* USER CODE END 2 */
 
     /* Infinite loop */
@@ -226,12 +227,12 @@ int main(void)
         }
 
 
-        BeaconSend();
+       BeaconSend();
 #ifdef LED
         LED_GPIO_Port->BSRR = LED_Pin;
 #endif
         
-#ifdef  PA
+#ifdef  PA      //KEEP ON WHEN TRANSMITTING
         //delay_us_Sleep(20000);
         delay_us_Sleep(4000);
         GPIOA->BRR = GPIO_PIN_0;
@@ -243,6 +244,7 @@ int main(void)
         GPIO_SLEEP();
 
         HAL_SuspendTick();
+   //     HAL_DBGMCU_EnableDBGStopMode();
         HAL_PWR_EnterSTOPMode(PWR_LOWPOWERREGULATOR_ON, PWR_SLEEPENTRY_WFI);
         /* Clear PWR wake up Flag */
         HAL_ResumeTick();
@@ -351,7 +353,7 @@ void BC7161_inital()
     AdvPayload.header.bits.length = pdu_length;
           //memcpy(AdvPayload.adv_data,ble_adv_pdu_IBEACON,sizeof(ble_adv_pdu_IBEACON));
     memcpy(AdvPayload.adv_data,(uint8_t*)(FLASH_USER_START_ADDR+6+(UUID_num*40)),31);
-        
+
 
 }
 
@@ -365,44 +367,47 @@ void BeaconSend(void)
     //BC7161_wakeup();
 
       BC7161_wakeupAndSamp();
-
+      if(!LOW_BAT)
+      {
     /* write adv data to BC7161 FIFO */
 #ifdef LED    
-    LED_GPIO_Port->BRR = LED_Pin;//LedOn();
+        LED_GPIO_Port->BRR = LED_Pin;//LedOn();
 #endif
-    if (BC7161_write_pdu_fifo((uint8_t*)&AdvPayload, pdu_length + ADV_HEADER_SIZE) == 0x03)
-    {
-        /* trigger TX start,0x81(CH37),0x83(CH37,CH38),0x87(CH37,CH38,CH39) */
-        ret = BC7161_TriggerAdvStart(ADV_CHANNEL);
-        if (ret == 0)
+        if (BC7161_write_pdu_fifo((uint8_t*)&AdvPayload, pdu_length + ADV_HEADER_SIZE) == 0x03)
         {
+        /* trigger TX start,0x81(CH37),0x83(CH37,CH38),0x87(CH37,CH38,CH39) */
+          ret = BC7161_TriggerAdvStart(ADV_CHANNEL);
+          if (ret == 0)
+          {
 
-            while (1)
+ //           while (1)
             {
   
-                LED_GPIO_Port->BRR = LED_Pin;//LedOn();
-                LED_GPIO_Port->BSRR = LED_Pin;
+//                LED_GPIO_Port->BRR = LED_Pin;//LedOn();
+//                LED_GPIO_Port->BSRR = LED_Pin;
 
             }
-        }
-        while (HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_1) == GPIO_PIN_RESET)
-        {
+            BC7161_inital();
+          }
+          while (HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_1) == GPIO_PIN_RESET)
+          {
             if (Timout-- == 0)
             {
                 BC7161_inital();
                 break;
             }
-        }
+          }
 #ifdef PA
-    GPIOA->BSRR = GPIO_PIN_0;
+          GPIOA->BSRR = GPIO_PIN_0;   //turn on PA
 #endif
+      }
+      else
+      {
+        BC7161_inital();
+//      while(1)
+//      {}
+      }
     }
-    else
-    {
-      while(1)
-      {}
-    }
-
     timeout_cnt = TIMEOUT_COUNTER;  //Tony	 20190919
 
 }
@@ -452,7 +457,7 @@ void GPIO_SLEEP(void)
     __HAL_RCC_GPIOA_CLK_DISABLE();
     __HAL_RCC_GPIOB_CLK_DISABLE();
     __HAL_RCC_GPIOF_CLK_DISABLE();
-    __HAL_RCC_I2C1_CLK_DISABLE();
+ //   __HAL_RCC_I2C1_CLK_DISABLE();
     __HAL_RCC_ADC1_CLK_DISABLE();
     __HAL_RCC_TIM14_CLK_DISABLE();
 }
@@ -477,8 +482,7 @@ void BC7161_wakeupAndSamp(void)
       SCL_RESET();                /* SCL = low */
       delay_us_Sleep(800);
       HAL_ADC_PollForConversion(&hadc, 10);
-      ADC->CCR &= ~ADC_CCR_VREFEN;
-      
+      ADC->CCR &= ~ADC_CCR_VREFEN; 
 #else
       HAL_ADC_Start(&hadc);
       SCL_RESET();                /* SCL = low */
@@ -486,18 +490,17 @@ void BC7161_wakeupAndSamp(void)
       HAL_ADC_PollForConversion(&hadc, 10);
 #endif
       ADC_VAL = HAL_ADC_GetValue(&hadc);
-      
 #ifdef COIN
       ADC_VAL = ADC_VAL - 50;
       ADC_VAL16 = (uint16_t)((VREFINT_MV * ADC_FULL_SCALE) / ADC_VAL );
-#else
-      
+#else  
         ADC_VAL16 = ADC_VAL & 0xffff;
         ADC_VAL16 = ADC_VAL16 * 1.46;
 #endif
+        
 #ifdef  COIN
-        if(ADC_VAL16 > 3000) BatLvl = 0x00;//high
-        else if(ADC_VAL16 > 2900) BatLvl = 0x40;
+        if(ADC_VAL16 > 2950) BatLvl = 0x00;//high
+        else if(ADC_VAL16 > 2850) BatLvl = 0x40;
         else if(ADC_VAL16 > 2700) BatLvl = 0x80;
         else BatLvl = 0xc0;
 #else
@@ -506,6 +509,8 @@ void BC7161_wakeupAndSamp(void)
         else if(ADC_VAL16 > 3700) BatLvl = 0x40;
         else if(ADC_VAL16 > 3500) BatLvl = 0x80;
         else BatLvl = 0xc0;
+        if (ADC_VAL16 < 3150) LOW_BAT = 1;
+        else LOW_BAT = 0;
 #endif
         AdvPayload.adv_data[6] &= 0x3F;
         AdvPayload.adv_data[6] |= BatLvl;
@@ -632,9 +637,14 @@ void UartTest(void)
             TxBuf[1] = 'I';
             TxBuf[2] = 'M';
             TxBuf[3] = 'E';
-            TxBuf[4] = 0x0d;
-            TxBuf[5] = 0x0a;
-            HAL_UART_Transmit(&huart1, TxBuf, 6, 100);
+            TxBuf[4] = '_';
+            TxBuf[5] = 'V';
+            TxBuf[6] = '1';
+            TxBuf[7] = '.';
+            TxBuf[8] = '1';  
+            TxBuf[9] = 0x0d;
+            TxBuf[10] = 0x0a;
+            HAL_UART_Transmit(&huart1, TxBuf, 11, 100);
             return;
         }
 
@@ -643,9 +653,14 @@ void UartTest(void)
     TxBuf[1] = 'O';
     TxBuf[2] = 'N';
     TxBuf[3] = 'E';
-    TxBuf[4] = 0x0d;
-    TxBuf[5] = 0x0a;
-    HAL_UART_Transmit(&huart1, TxBuf, 6, 100);
+    TxBuf[4] = '_';
+    TxBuf[5] = 'V';
+    TxBuf[6] = '1';
+    TxBuf[7] = '.';
+    TxBuf[8] = '1';    
+    TxBuf[9] = 0x0d;
+    TxBuf[10] = 0x0a;
+    HAL_UART_Transmit(&huart1, TxBuf, 11, 100);
 }
 
 /**

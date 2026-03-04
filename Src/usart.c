@@ -83,7 +83,7 @@ void HAL_UART_MspInit(UART_HandleTypeDef* uartHandle)
 
 void HAL_UART_MspDeInit(UART_HandleTypeDef* uartHandle)
 {
-
+GPIO_InitTypeDef GPIO_InitStruct = {0};
   if(uartHandle->Instance==USART1)
   {
   /* USER CODE BEGIN USART1_MspDeInit 0 */
@@ -101,7 +101,14 @@ void HAL_UART_MspDeInit(UART_HandleTypeDef* uartHandle)
     /* USART1 interrupt Deinit */
     HAL_NVIC_DisableIRQ(USART1_IRQn);
   /* USER CODE BEGIN USART1_MspDeInit 1 */
-
+      GPIO_InitStruct.Pin = GPIO_PIN_9 | GPIO_PIN_10;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+  
+  
+   HAL_GPIO_WritePin(LED_GPIO_Port, GPIO_PIN_6 | GPIO_PIN_7 | GPIO_PIN_9 | GPIO_PIN_10, GPIO_PIN_SET);
   /* USER CODE END USART1_MspDeInit 1 */
   }
 } 

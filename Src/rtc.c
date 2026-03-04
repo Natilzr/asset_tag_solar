@@ -220,9 +220,14 @@ static void RTC_AlarmConfig(void)
   salarmstructure.AlarmTime.TimeFormat = RTC_HOURFORMAT12_AM;
   salarmstructure.AlarmTime.Hours = 0x02;
   salarmstructure.AlarmTime.Minutes = 0x20;
-  salarmstructure.AlarmTime.Seconds = 0x11;//0.8192*6  = 8.2sec
+  //salarmstructure.AlarmTime.Seconds = 0x11;//0.8192*6  = 8.2sec
   salarmstructure.AlarmTime.Seconds = 0x07;//0.8192*6  = 8.2sec
   //salarmstructure.AlarmTime.Seconds = 0x02;//0x10;//0.8192*6  = 8.2sec
+  
+  /******************  for test ****/
+  //  salarmstructure.AlarmTime.Seconds = 0x25;//0.8192*6  = 8.2sec
+  
+  
   salarmstructure.AlarmTime.SubSeconds = 0x06F;//0xF9;
   
   if(HAL_RTC_SetAlarm_IT(&hrtc,&salarmstructure,RTC_FORMAT_BCD) != HAL_OK)
