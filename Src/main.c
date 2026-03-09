@@ -47,7 +47,7 @@
 #define FLASH_USER_START_ADDR   0x08003C00   /* Start @ of user Flash area */
 #define FLASH_USER_END_ADDR     0x08003F00   /* End @ of user Flash area */
 
-#define SAMPLING_TIME        10//  10*60
+#define SAMPLING_TIME         10*60
 #define TICK_TIME       10
 #define ADC_TIME        SAMPLING_TIME/TICK_TIME
 
@@ -642,9 +642,11 @@ void UartTest(void)
             TxBuf[6] = '1';
             TxBuf[7] = '.';
             TxBuf[8] = '1';  
-            TxBuf[9] = 0x0d;
-            TxBuf[10] = 0x0a;
-            HAL_UART_Transmit(&huart1, TxBuf, 11, 100);
+            TxBuf[9] = 'C';
+            TxBuf[10] = 'A';    
+            TxBuf[11] = 0x0d;
+            TxBuf[12] = 0x0a;
+            HAL_UART_Transmit(&huart1, TxBuf, 13, 100);
             return;
         }
 
@@ -657,10 +659,12 @@ void UartTest(void)
     TxBuf[5] = 'V';
     TxBuf[6] = '1';
     TxBuf[7] = '.';
-    TxBuf[8] = '1';    
-    TxBuf[9] = 0x0d;
-    TxBuf[10] = 0x0a;
-    HAL_UART_Transmit(&huart1, TxBuf, 11, 100);
+    TxBuf[8] = '1';
+    TxBuf[9] = 'C';
+    TxBuf[10] = 'A';    
+    TxBuf[11] = 0x0d;
+    TxBuf[12] = 0x0a;
+    HAL_UART_Transmit(&huart1, TxBuf, 13, 100);
 }
 
 /**
